@@ -50,6 +50,15 @@ S^{tot} = \begin{bmatrix}
 \end{bmatrix}
 $$
 
+This matrix can be found by a summation over the Kronecker products of the basis matricies and the Identity matrix.
+
+~~~~~~~~~Mathematica
+ArrayFlatten[
+  Outer[Times, PauliMatrix[3], IdentityMatrix[2]] +
+   Outer[Times, IdentityMatrix[2], PauliMatrix[3]]
+  ] // MatrixForm
+~~~~~~~~~
+
 Tha hamiliton of this system can be formed using the Kronecker product of the individual basis elements. This is implimented in Mathematica as Outer[Times, Sz, Sz], and a custom impl was used in C. This matrix is diagonal, and as such the eigenvalues are the diagonal elements and the eigenvectors are just unit vectors.
 
 $$
@@ -62,3 +71,5 @@ H^{tot} = S_{z} \otimes S_{z} = \begin{bmatrix}
 $$
 
 The Hamiltonion for a state mesured in a inconsistant basis, for example $S_{z2}\otimes S_{y1}$, is not diagonal.
+
+A good primer is http://electron6.phys.utk.edu/qm1/modules/m10/twospin.htm.
