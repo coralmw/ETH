@@ -70,6 +70,137 @@ H^{tot} = S_{z} \otimes S_{z} = \begin{bmatrix}
 \end{bmatrix}
 $$
 
+The Eigensystem of this is given by
+$$
+\left(
+\begin{array}{cccc}
+ -\frac{1}{4} \left(3 \hbar ^2\right) & \frac{\hbar ^2}{4} & \frac{\hbar ^2}{4} & \frac{\hbar ^2}{4} \\
+ \{0,-1,1,0\} & \{0,0,0,1\} & \{0,1,1,0\} & \{1,0,0,0\} \\
+\end{array}
+\right)
+$$
+
 The Hamiltonion for a state mesured in a inconsistant basis, for example $S_{z2}\otimes S_{y1}$, is not diagonal.
 
 A good primer is http://electron6.phys.utk.edu/qm1/modules/m10/twospin.htm.
+
+To find $S^2$, the total spin including interactions, you need to find $S_{1}\cdot S_{2}$. S is defined in the full 4 element basis.
+
+$$
+S_{1}\cdot S_{2} = S_{1_{x}} \cdot S_{2_{x}} + S_{1_{y}} \cdot S_{2_{y}} + S_{1_{z}} \cdot S_{2_{z}} = \frac{\hbar^2}{4} \left(
+\begin{array}{cccc}
+ 1 & 0 & 0 & 0 \\
+ 0 & -1 & 2 & 0 \\
+ 0 & 2 & -1 & 0 \\
+ 0 & 0 & 0 & 1 \\
+\end{array}
+\right)
+$$
+
+#BLAS and LAPACK on the Xeon Phi
+
+Intel provides the MKL - a coolection of numerical routienes that are optimised for use on intel processors. A kronecker product is not part of standerd BLAS/LAPACK so I used the following C code.
+
+~~~~~~~~~~~~~C
+void Kronecker_Product_complex(complex *C, complex *A, int nrows, int ncols,
+                                               complex *B, int mrows, int mcols)
+{
+   int ccols, i, j, k, l;
+   int block_increment;
+   complex *pB;
+   complex *pC, *p_C;
+
+   ccols = ncols * mcols;
+   block_increment = mrows * ccols;
+   for (i = 0; i < nrows; C += block_increment, i++)
+      for (p_C = C, j = 0; j < ncols; p_C += mcols, A++, j++)
+         for (pC = p_C, pB = B, k = 0; k < mrows; pC += ccols, k++)
+            for (l = 0; l < mcols; pB++, l++) *(pC+l) = *A * *pB;
+
+}
+~~~~~~~~~~~~~
+
+#Meeting 2
+#Density Matrix
+
+$$
+\hat{\rho}(t) = \ket{\psi(t)}\bra{\psi(t)} \tag*{Defn of density matrix}
+$$
+$$
+\hat{\rho}^{\text{reduced}}_{i,j}(t) = \sum_{n} \ket{i}_{S}\ket{n}_{B} \hat{\rho} \bra{n}_{B}\bra{j}_{S}   \tag*{Defn of the reduced density matrix}
+$$
+
+The reduced density matrix, by the ETH, goes diagonal as the bath becomes suffucently complex.
+
+$$
+\ket{\psi} = \sum_{n} C_{n} \exp^{-\frac{i E_{n} t}{\hbar} } \ket{A_{n}}
+$$
+
+##Example 1
+
+$$
+\ket{\psi(0)} = ket{\uparrow}_{S}\ket{uparrow}_{B}
+
+\newpage
+#Appendix
+##Mathematica code for $S_{1}\cdot S_{2}$. {#sec:appendix_one}
+
+~~~~~~~~~~~~~Mathematica
+Subscript[S, 1 z] =
+ ArrayFlatten[
+  Outer[Times, \[HBar]/2 PauliMatrix[3],
+   IdentityMatrix[2]]]; Subscript[S, 2 z] =
+ ArrayFlatten[
+  Outer[Times, IdentityMatrix[2], \[HBar]/2 PauliMatrix[3]]];
+Subscript[S, 1 y] =
+ ArrayFlatten[
+  Outer[Times, \[HBar]/2 PauliMatrix[2],
+   IdentityMatrix[2]]]; Subscript[S, 2 y] =
+ ArrayFlatten[
+  Outer[Times, IdentityMatrix[2], \[HBar]/2 PauliMatrix[2]]];
+Subscript[S, 1 x] =
+ ArrayFlatten[
+  Outer[Times, \[HBar]/2 PauliMatrix[1],
+   IdentityMatrix[2]]]; Subscript[S, 2 x] =
+ ArrayFlatten[
+  Outer[Times, IdentityMatrix[2], \[HBar]/2 PauliMatrix[1]]];
+ArrayFlatten[Subscript[S, 1 z] + Subscript[S, 2 z]] // MatrixForm;
+ArrayFlatten[Subscript[S, 1 y] + Subscript[S, 2 y]] // MatrixForm;
+ArrayFlatten[Subscript[S, 1 z] + Subscript[S, 2 z]] // MatrixForm;
+Subscript[S, 1 y].Subscript[S, 2 y] // MatrixForm
+ArrayFlatten[
+  ArrayFlatten[
+   Subscript[S, 1 x].Subscript[S, 2 x] +
+    Subscript[S, 1 y].Subscript[S, 2 y] +
+    Subscript[S, 1 z].Subscript[S, 2 z]]] // MatrixForm
+~~~~~~~~~~~~~
+
+##First meeting results
+### $H^{tot}$ in each basis
+
+$$
+H^{tot}_{x} = \frac{\hbar ^2}{4}\left(
+\begin{array}{cccc}
+0 & 0 & 0 & 1 \\
+0 & 0 & 1 & 0 \\
+0 & 1 & 0 & 0 \\
+1 & 0 & 0 & 0 \\
+\end{array}
+\right),
+H^{tot}_{y} = \frac{\hbar ^2}{4}\left(
+\begin{array}{cccc}
+0 & 0 & 0 & -1 \\
+0 & 0 & 1 & 0 \\
+0 & 1 & 0 & 0 \\
+-1 & 0 & 0 & 0 \\
+\end{array}
+\right),
+H^{tot}_{z} = \frac{\hbar ^2}{4}\left(
+\begin{array}{cccc}
+1 & 0 & 0 & 0 \\
+0 & -1 & 0 & 0 \\
+0 & 0 & -1 & 0 \\
+0 & 0 & 0 & 1 \\
+\end{array}
+\right)
+$$
