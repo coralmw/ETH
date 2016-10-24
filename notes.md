@@ -140,6 +140,52 @@ $$
 
 $$
 \ket{\psi(0)} = ket{\uparrow}_{S}\ket{uparrow}_{B}
+$$
+
+##Solving $\hat{\rho}^{\text{reduced}}_{i,j}(t)$
+
+$$
+\hat{\rho}^{\text{reduced}}_{\uparrow,\uparrow}(t) = \ket{\uparrow}_{S}\ket{\uparrow}_{B}\hat{\rho}\bra{\uparrow}_{B}\bra{\uparrow}_{S} +
+\ket{\uparrow}_{S}\ket{\downarrow}_{B}\hat{\rho}\bra{\downarrow}_{B}\bra{\uparrow}_{S}
+$$
+
+$$
+\ket{\uparrow}_{B}\hat{\rho}\bra{\uparrow}_{B} = \ket{\uparrow}_{B}\ket{\psi}_{B}\bra{\psi}_{B}\bra{\uparrow}_{B} = \frac{1}{4}\left[ \ket{3}\bra{3} + e^{-i \hbar t} \ket{3}\bra{1} - e^{i \hbar t} \ket{1}\bra{1} + \ket{1}\bra{1} \right]
+$$
+
+$$
+\ket{3}\bra{1} = \begin{pmatrix}0\\1\\1\\0\end{pmatrix}\begin{pmatrix}0&&-1&&1&&0\end{pmatrix} = \begin{pmatrix}0&&0&&0&&0\\0&&-1&&1&&0\\0&&-1&&1&&0\\0&&0&&0&&0\end{pmatrix}
+$$
+
+Outer product of matricies:
+
+$$
+\ket{1}\bra{1} = \begin{pmatrix}0\\-1\\1\\0\end{pmatrix}\begin{pmatrix}0&&-1&&1&&0\end{pmatrix} = \begin{pmatrix}0&&0&&0&&0\\0&&1&&-1&&0\\0&&-1&&1&&0\\0&&0&&0&&0\end{pmatrix}
+$$
+$$
+\ket{3}\bra{3} = \begin{pmatrix}0\\1\\1\\0\end{pmatrix}\begin{pmatrix}0&&1&&1&&0\end{pmatrix} = \begin{pmatrix}0&&0&&0&&0\\0&&1&&1&&0\\0&&1&&1&&0\\0&&0&&0&&0\end{pmatrix}
+$$
+$$
+\ket{1}\bra{3} = \begin{pmatrix}0\\-1\\1\\0\end{pmatrix}\begin{pmatrix}0&&1&&1&&0\end{pmatrix} = \begin{pmatrix}0&&0&&0&&0\\0&&-1&&-1&&0\\0&&1&&1&&0\\0&&0&&0&&0\end{pmatrix}
+$$
+
+Putting it back into the expression for $\ket{\uparrow}_{B}\hat{\rho}\bra{\uparrow}_{B}$
+
+$$
+\ket{\uparrow}_{B}\hat{\rho}\bra{\uparrow}_{B} = \begin{pmatrix}0&&1&&0&&0\end{pmatrix}\begin{pmatrix}0&&0&&0&&0\\
+  0 && 2i \sin{\hbar t} && 2 \cos{\hbar t} && 0 \\
+  0 && -2 \cos{\hbar t} && - 2i \sin{\hbar t} && 0 \\
+0 && 0 && 0&& 0 \end{pmatrix}
+\begin{pmatrix} 0\\1\\0\\0\end{pmatrix} = i \sin{\hbar t}
+$$
+
+
+
+
+
+
+
+
 
 \newpage
 #Appendix
