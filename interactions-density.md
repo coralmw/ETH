@@ -1,3 +1,5 @@
+##finding the decomposition
+
 start with the defenition of a state as before
 
 $$
@@ -34,12 +36,42 @@ $$
 \ket{B_{z}}\left( \sum_{i}C_{i z}\ket{S_{i}} \right) = \sum_{n}C_{n}\ket{N_n}
 $$
 
-left multiply by $\sum_{i'}C^{\star}_{i z}\bra{S_{i'}}$,
+left multiply by $\sum_{i'}C^{\star}_{i' z}\bra{S_{i'}}$,
 
 $$
-\left(\sum_{i'}C^{\star}_{i z}\bra{S_{i'}} \right) \ket{B_{z}}\left( \sum_{i}C_{i z}\ket{S_{i}} \right) = \left(\sum_{i'}C^{\star}_{i z}\bra{S_{i'}} \right) \sum_{n}C_{n}\ket{N_n}
+\left(\sum_{i'}C^{\star}_{i z}\bra{S_{i'}} \right) \ket{B_{z}}\left( \sum_{i}C_{i z}\ket{S_{i}} \right) = \left(\sum_{i'}C^{\star}_{i' z}\bra{S_{i'}} \right) \sum_{n}C_{n}\ket{N_n}
 $$
 
 $$
-\ket{B_{z}} \left(\sum_{ii'}C_{i z}C^{\star}_{i z}\bra{S_{i'}}\ket{S_{i}} \right) = \left(\sum_{i'}C^{\star}_{i z}\bra{S_{i'}} \right) \sum_{n}C_{n}\ket{N_n}
+\ket{B_{z}} \left(\sum_{ii'}C_{i z}C^{\star}_{i z}\bra{S_{i'}}\ket{S_{i}} \right) = \left(\sum_{i'}C^{\star}_{i' z}\bra{S_{i'}} \right) \sum_{n}C_{n}\ket{N_n}
+$$
+
+$$
+\ket{B_{z}} \left(\sum_{ii'}C_{i z}C^{\star}_{i z}\delta_{ii'} \right) = \left(\sum_{i'}C^{\star}_{i' z}\bra{S_{i'}} \right) \sum_{n}C_{n}\ket{N_n}
+$$
+
+$$
+\ket{B_{z}} \left(\sum_{i}C_{i z}C^{\star}_{i z} \right) = \sum_{i'n}C^{\star}_{i' z}C_{n}\bra{S_{i'}}\ket{N_n}
+$$
+
+$$
+\ket{B_{z}} = \frac{\sum_{i'n}C^{\star}_{i' z}C_{n}\bra{S_{i'}}\ket{N_n}}{\sum_{i}C_{i z}C^{\star}_{i z}}
+$$
+
+##Density matrix
+
+Introduce $\rho = \ket{\psi} \bra{\psi}$
+
+$$
+\rho = (\sum_{q}C_{q} \ket{N_q})(\sum_{q'}C^{\star}_{q'} \bra{N_q'})
+$$
+
+Find the partial trace,
+
+$$
+\sum_{n}\bra{B_n}\rho\ket{B_n} = \left( \frac{\sum_{i'n}C_{i' z}C^{\star}_{n}\ket{S_{i'}}\bra{N_n}}{\sum_{i}C^{\star}_{i z}C_{i z}} \right) \left(\sum_{q} C_{q} \ket{N_q} \right)\left(\sum_{q'}C^{\star}_{q'} \bra{N_q'} \right) \left( \frac{\sum_{i'n}C^{\star}_{i' z}C_{n}\bra{S_{i'}}\ket{N_n}}{\sum_{i}C_{i z}C^{\star}_{i z}} \right)
+$$
+
+$$
+\sum_{n}\bra{B_n}\rho\ket{B_n} = \frac{aaa}{\left( \sum_{i}C_{i z}C^{\star}_{i z} \right)^2 }
 $$
