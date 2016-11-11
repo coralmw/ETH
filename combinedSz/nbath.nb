@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       158,          7]
-NotebookDataLength[     62484,       1403]
-NotebookOptionsPosition[     61313,       1359]
-NotebookOutlinePosition[     61648,       1374]
-CellTagsIndexPosition[     61605,       1371]
+NotebookDataLength[     62644,       1406]
+NotebookOptionsPosition[     61452,       1361]
+NotebookOutlinePosition[     61810,       1377]
+CellTagsIndexPosition[     61767,       1374]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -216,32 +216,34 @@ Cell[BoxData[{
            RowBox[{"s1", ",", "0", ",", "1"}], "}"}]}], "]"}], ",", 
         RowBox[{"{", 
          RowBox[{"s2", ",", "0", ",", "1"}], "}"}]}], "]"}], "]"}], "]"}]}], 
-   ";"}], "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"Print", "[", 
-   RowBox[{"\"\<Hamiltonion :\>\"", ",", " ", 
-    RowBox[{"H", "//", "MatrixForm"}]}], "]"}], 
-  ";"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"AllInStates", "=", 
-   RowBox[{"Apply", "[", 
-    RowBox[{"Join", ",", 
-     RowBox[{"Table", "[", 
-      RowBox[{
-       RowBox[{"SeperatedStates", "[", 
-        RowBox[{"s", ",", "b"}], "]"}], ",", 
-       RowBox[{"{", 
-        RowBox[{"s", ",", "0", ",", "1"}], "}"}], ",", 
-       RowBox[{"{", 
-        RowBox[{"b", ",", "0", ",", "NoBasis"}], "}"}]}], "]"}]}], "]"}]}], 
-  ";"}], "\[IndentingNewLine]", 
- RowBox[{"Print", "[", 
-  RowBox[{"\"\<Input states :\>\"", ",", " ", "AllInStates"}], 
-  "]"}], "\[IndentingNewLine]", 
- RowBox[{"Print", "[", 
-  RowBox[{"\"\<Len input states :\>\"", ",", " ", 
-   RowBox[{"Length", "[", "AllInStates", "]"}], ",", " ", 
-   "\"\< should be \>\"", ",", "NoStates"}], "]"}], "\[IndentingNewLine]", 
+   ";"}], "\[IndentingNewLine]", "\[IndentingNewLine]", 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"Print", "[", 
+     RowBox[{"\"\<Hamiltonion :\>\"", ",", " ", 
+      RowBox[{"H", "//", "MatrixForm"}]}], "]"}], ";", "\[IndentingNewLine]", 
+    
+    RowBox[{"AllInStates", "=", 
+     RowBox[{"Apply", "[", 
+      RowBox[{"Join", ",", 
+       RowBox[{"Table", "[", 
+        RowBox[{
+         RowBox[{"SeperatedStates", "[", 
+          RowBox[{"s", ",", "b"}], "]"}], ",", 
+         RowBox[{"{", 
+          RowBox[{"s", ",", "0", ",", "1"}], "}"}], ",", 
+         RowBox[{"{", 
+          RowBox[{"b", ",", "0", ",", "NoBasis"}], "}"}]}], "]"}]}], "]"}]}], 
+    ";", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"Print", "[", 
+      RowBox[{"\"\<Input states :\>\"", ",", " ", "AllInStates"}], "]"}], 
+     "\[IndentingNewLine]", 
+     RowBox[{"Print", "[", 
+      RowBox[{"\"\<Len input states :\>\"", ",", " ", 
+       RowBox[{"Length", "[", "AllInStates", "]"}], ",", " ", 
+       "\"\< should be \>\"", ",", "NoStates"}], "]"}]}]}], 
+   "*)"}]}], "\[IndentingNewLine]", 
  RowBox[{"MatrixForm", "[", "p", "]"}], "\[IndentingNewLine]", 
  RowBox[{"TrigReduce", "[", 
   RowBox[{"Tr", "[", "p", "]"}], "]"}]}], "Input",
@@ -291,7 +293,7 @@ Cell[BoxData[{
    3.687686878008503*^9, 3.6876870154046783`*^9}, {3.687687059715622*^9, 
    3.687687074037488*^9}, {3.687687114694994*^9, 3.687687151205585*^9}, {
    3.6876872037432423`*^9, 3.687687229838056*^9}, {3.687687289069901*^9, 
-   3.6876872892091208`*^9}}],
+   3.6876872892091208`*^9}, {3.687774173452606*^9, 3.687774185938346*^9}}],
 
 Cell[CellGroupData[{
 
@@ -1358,8 +1360,9 @@ Cell[BoxData["16"], "Output",
 }, Open  ]]
 },
 WindowSize->{673, 699},
-WindowMargins->{{Automatic, 6}, {25, Automatic}},
-FrontEndVersion->"10.3 for Linux x86 (64-bit) (October 9, 2015)",
+WindowMargins->{{563, Automatic}, {197, Automatic}},
+FrontEndVersion->"10.3 for Mac OS X x86 (32-bit, 64-bit Kernel) (October 9, \
+2015)",
 StyleDefinitions->"Default.nb"
 ]
 (* End of Notebook Content *)
@@ -1374,36 +1377,36 @@ CellTagsIndex->{}
 (*NotebookFileOutline
 Notebook[{
 Cell[CellGroupData[{
-Cell[580, 22, 11112, 271, 1313, "Input"],
+Cell[580, 22, 11251, 273, 906, "Input"],
 Cell[CellGroupData[{
-Cell[11717, 297, 23722, 527, 1029, "Print"],
-Cell[35442, 826, 13853, 244, 936, "Print"],
-Cell[49298, 1072, 981, 16, 23, "Print"]
+Cell[11856, 299, 23722, 527, 934, "Print"],
+Cell[35581, 828, 13853, 244, 668, "Print"],
+Cell[49437, 1074, 981, 16, 22, "Print"]
 }, Open  ]],
-Cell[50294, 1091, 4437, 93, 82, "Output"],
-Cell[54734, 1186, 2356, 32, 65, "Output"]
+Cell[50433, 1093, 4437, 93, 67, "Output"],
+Cell[54873, 1188, 2356, 32, 28, "Output"]
 }, Open  ]],
-Cell[57105, 1221, 69, 1, 32, "Input"],
-Cell[57177, 1224, 141, 2, 32, "Input"],
+Cell[57244, 1223, 69, 1, 28, "Input"],
+Cell[57316, 1226, 141, 2, 28, "Input"],
 Cell[CellGroupData[{
-Cell[57343, 1230, 1276, 35, 165, "Input"],
-Cell[58622, 1267, 135, 3, 32, "Output"]
-}, Open  ]],
-Cell[CellGroupData[{
-Cell[58794, 1275, 1454, 41, 165, "Input"],
-Cell[60251, 1318, 202, 5, 32, "Output"]
+Cell[57482, 1232, 1276, 35, 131, "Input"],
+Cell[58761, 1269, 135, 3, 28, "Output"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[60490, 1328, 100, 1, 32, "Input"],
-Cell[60593, 1331, 72, 1, 32, "Output"]
+Cell[58933, 1277, 1454, 41, 131, "Input"],
+Cell[60390, 1320, 202, 5, 28, "Output"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[60702, 1337, 159, 3, 32, "Input"],
-Cell[60864, 1342, 159, 3, 32, "Output"]
+Cell[60629, 1330, 100, 1, 28, "Input"],
+Cell[60732, 1333, 72, 1, 28, "Output"]
 }, Open  ]],
 Cell[CellGroupData[{
-Cell[61060, 1350, 163, 3, 32, "Input"],
-Cell[61226, 1355, 71, 1, 32, "Output"]
+Cell[60841, 1339, 159, 3, 28, "Input"],
+Cell[61003, 1344, 159, 3, 28, "Output"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[61199, 1352, 163, 3, 28, "Input"],
+Cell[61365, 1357, 71, 1, 28, "Output"]
 }, Open  ]]
 }
 ]
