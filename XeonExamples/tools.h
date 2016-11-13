@@ -24,3 +24,12 @@ void print_cmatrix( char* desc, int m, int n, const MKL_Complex8* a, int lda ) {
                 printf( "\n" );
         }
 }
+
+void print_cmatrix_noimag( char* desc, int m, int n, const MKL_Complex8* a, int lda ) {
+        int i, j;
+        printf( "\n %s\n", desc );
+        for( i = 0; i < m; i++ ) {
+                for( j = 0; j < n; j++ ) printf( " %3.2f", a[i+j*lda].real);
+                printf( "\n" );
+        }
+}
