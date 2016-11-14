@@ -8,7 +8,7 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 11
+#define SPINS 12
 
 
 const MKL_Complex8 Sx[2*2] = {
@@ -123,19 +123,25 @@ int main() {
 
     }
   }
-  //
+
   printf( "calculating H\n" );
 
   MKL_Complex8 *H = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
+
+  // MKL_Complex8 *spin1 = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
+  // MKL_Complex8 *spin2 = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
+
   assert(H != NULL);
   for (int i = 0; i<states*states; i++) H[i] = (MKL_Complex8) {0, 0};
-
-  for (int startspin = 0; startspin < SPINS; startspin++){
-    for (int dim = 0; dim<3; dim++){
+  int startspin;
+  dim = 0;
+  for (startspin = 0; startspin < SPINS; startspin++){
+    for (dim = 0; dim<3; dim++){
       // we matrix-mult S(dim)1 by S(dim)2 and add the result to H
       //printf( "next part of H H\n" );
-      const float one = 2;
-      //scgemm("N", "N", &states, &states, &states, &one, Snn[dim][0], &states, Snn[dim][1], &states, &one, H, &states);
+      // SNN(spin1, startspin, dim);
+      // SNN(spin2, (startspin+1)%SPINS, dim);
+
       cblas_cgemm(CblasRowMajor, // Layout
         CblasNoTrans, // take the transpose of a?
         CblasNoTrans, // take the transpose of B?
@@ -151,6 +157,23 @@ int main() {
         H, // C
         states //Specifies the leading dimension of c as declared in the calling (sub)program.
         );
+
+      // cblas_cgemm(CblasRowMajor, // Layout
+      //   CblasNoTrans, // take the transpose of a?
+      //   CblasNoTrans, // take the transpose of B?
+      //   states, // rows of A, C
+      //   states, // cols of B, C
+      //   states, // clos A, rows B
+      //   &(MKL_Complex8){1, 0},   // prefactor of the multiplication
+      //   spin1, //A Array, size lda* m.
+      //   states,      // Specifies the leading dimension of a as declared in the calling (sub)program.
+      //   spin2, // B Array, size ldb by k. Before entry the leading n-by-k part of the array b must contain the matrix B.
+      //   states,      // Specifies the leading dimension of b as declared in the calling (sub)program.
+      //   &(MKL_Complex8){1, 0}, // prefactor of addition
+      //   H, // C
+      //   states //Specifies the leading dimension of c as declared in the calling (sub)program.
+      //   );
+
       //cblas_csscal(states*states, 5.0, H, 1);
       //printf( "finished this mm for H\n" );
     }
