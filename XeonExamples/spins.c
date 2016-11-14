@@ -8,7 +8,7 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 12
+#define SPINS 2
 
 
 const MKL_Complex8 Sx[2*2] = {
@@ -42,7 +42,6 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
   // we use result to hold intermediate results as we know it's big enough
   // we start from the final matrix and work back.
   MKL_Complex8 *tempstart = malloc( states*states*sizeof( MKL_Complex8 ));
-  // MKL_Complex8 *tempend = malloc( states*states*sizeof( MKL_Complex8 ));
   if (tempstart == NULL) {
     exit(-1);
   }
@@ -74,20 +73,16 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
     // copy tempend to tempstart to use next iteration, and zero tempend
     for (int ti=0; ti < states*states; ti++ ) {
       tempstart[ti] = result[ti];
-      //tempend[ti] = (MKL_Complex8){0, 0};
     }
   } // end for kin in SPINS-3
 
   // return the result
-  // for (int ti=0; ti < states*states; ti++ ) {
-  //   result[ti] = tempstart[ti];
-  // }
+  for (int ti=0; ti < states*states; ti++ ) {
+    result[ti] = tempstart[ti];
+  }
 
   free(tempstart);
-  //free(tempend);
 }
-
-
 
 
 
@@ -108,18 +103,8 @@ int main() {
       assert(Snn[spin][dim] != NULL);
 
       SNN(Snn[spin][dim], spin, dim);
-
-      // if (SPINS == 2){ // don't know how to do more spins yet. nested kron
-      //   if (spin==0) {
-      //     Kronecker_Product_MKL_Complex8(Snn[spin][dim], Sn[dim], 2, 2, idty, 2, 2);
-      //   } else if (spin == 1) {
-      //     Kronecker_Product_MKL_Complex8(Snn[spin][dim], idty, 2, 2, Sn[dim], 2, 2);
-      //   }
-      // } else {
-      //   SNN(Snn[spin][dim], spin, dim);
-      // }
-
-      //print_cmatrix("", states, states, Snn[spin][dim], states);
+      printf("state %d dim %d\n", spin, dim);
+      print_cmatrix("", states, states, Snn[spin][dim], states );
 
     }
   }
@@ -127,9 +112,6 @@ int main() {
   printf( "calculating H\n" );
 
   MKL_Complex8 *H = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
-
-  // MKL_Complex8 *spin1 = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
-  // MKL_Complex8 *spin2 = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
 
   assert(H != NULL);
   for (int i = 0; i<states*states; i++) H[i] = (MKL_Complex8) {0, 0};
@@ -139,8 +121,6 @@ int main() {
     for (dim = 0; dim<3; dim++){
       // we matrix-mult S(dim)1 by S(dim)2 and add the result to H
       //printf( "next part of H H\n" );
-      // SNN(spin1, startspin, dim);
-      // SNN(spin2, (startspin+1)%SPINS, dim);
 
       cblas_cgemm(CblasRowMajor, // Layout
         CblasNoTrans, // take the transpose of a?
@@ -157,24 +137,6 @@ int main() {
         H, // C
         states //Specifies the leading dimension of c as declared in the calling (sub)program.
         );
-
-      // cblas_cgemm(CblasRowMajor, // Layout
-      //   CblasNoTrans, // take the transpose of a?
-      //   CblasNoTrans, // take the transpose of B?
-      //   states, // rows of A, C
-      //   states, // cols of B, C
-      //   states, // clos A, rows B
-      //   &(MKL_Complex8){1, 0},   // prefactor of the multiplication
-      //   spin1, //A Array, size lda* m.
-      //   states,      // Specifies the leading dimension of a as declared in the calling (sub)program.
-      //   spin2, // B Array, size ldb by k. Before entry the leading n-by-k part of the array b must contain the matrix B.
-      //   states,      // Specifies the leading dimension of b as declared in the calling (sub)program.
-      //   &(MKL_Complex8){1, 0}, // prefactor of addition
-      //   H, // C
-      //   states //Specifies the leading dimension of c as declared in the calling (sub)program.
-      //   );
-
-      //cblas_csscal(states*states, 5.0, H, 1);
       //printf( "finished this mm for H\n" );
     }
   }
@@ -186,10 +148,43 @@ int main() {
     trace.real += H[ti+states*ti].real;
     trace.imag += H[ti+states*ti].imag;
   }
-  printf("trace of H is %f+i%f", trace.real, trace.imag);
-  //print_cmatrix_noimag( "H", states, states, H, states);
+  printf("trace of H is %f+i%f\n", trace.real, trace.imag);
+  print_cmatrix_noimag( "H", states, states, H, states);
+
+  for (spin=0; spin<SPINS; spin++)
+    for (dim=0; dim<3; dim++) free(Snn[spin][dim]); // remove the spins matrixes
+
+  // find eigenvalues/vectors of H
+  MKL_Complex8 *eigen = malloc( (states)*sizeof( MKL_Complex8 ));
+
+  MKL_Complex8 *eigen_real = malloc( (states)*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *eigen_imag = malloc( (states)*sizeof( MKL_Complex8 ));
+
+  int info = LAPACKE_cgeev( LAPACK_ROW_MAJOR, //matrix Layout
+    'N', // compute left eigenvectors
+    'V',// compute right eigenvectors
+    states, // size of H
+    H, // matrix to eigensolve
+    states, // lda
+    eigen, // output for
+  NULL, 0, NULL, 0);
+   // H is nonsense after this call, but we don't need it
+  /* Check for convergence */
+  if( info > 0 ) {
+          printf( "The algorithm failed to compute eigenvalues.\n" );
+          exit( 1 );
+  }
+  for (int eval = 0; eval<states; eval++) printf("%d eigenvalue is %f+i%f\n", eval, eigen[eval].real, eigen[eval].imag);
+
+  // MKL_Complex8 *tau = malloc( (states-1)*sizeof( MKL_Complex8 )); // Contains scalars that define elementary reflectors for the matrix Q.
+  // float *Q = malloc( states*states*sizeof( float )); // Contains scalars that define elementary reflectors for the matrix Q.
+  //
+  // int info = LAPACKE_cgehrd(LAPACK_ROW_MAJOR, states, 1, states, H, states, tau);
+  // assert(info == 0);
+  // int info = LAPACKE_sorghr(LAPACK_ROW_MAJOR, states, 1, states, H, tau, states, Q);
+  // assert(info == 0);
+
 
   // calculate eigenstates etc
-
 
 }
