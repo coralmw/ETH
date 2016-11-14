@@ -42,14 +42,14 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
   // we use result to hold intermediate results as we know it's big enough
   // we start from the final matrix and work back.
   MKL_Complex8 *tempstart = malloc( states*states*sizeof( MKL_Complex8 ));
-  MKL_Complex8 *tempend = malloc( states*states*sizeof( MKL_Complex8 ));
-  if (tempstart == NULL || tempend == NULL) {
+  // MKL_Complex8 *tempend = malloc( states*states*sizeof( MKL_Complex8 ));
+  if (tempstart == NULL) {
     exit(-1);
   }
 
   for (int ti=0; ti < states*states; ti++ ) {
     tempstart[ti] = (MKL_Complex8){0, 0};
-    tempend[ti] = (MKL_Complex8){0, 0};
+    result[ti] = (MKL_Complex8){0, 0};
   }
 
   // construct the end of the product chain. make sure to include the pauli matirx if needed
@@ -64,27 +64,27 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
     // we need to do it from the outside first, and allocate a matrix to hold the temp result.
 
     if (spin == ki){
-      Kronecker_Product_MKL_Complex8(tempend, Sn[dim], 2, 2, tempstart, tempsize, tempsize);
+      Kronecker_Product_MKL_Complex8(result, Sn[dim], 2, 2, tempstart, tempsize, tempsize);
     } else {
-      Kronecker_Product_MKL_Complex8(tempend, idty, 2, 2, tempstart, tempsize, tempsize);
+      Kronecker_Product_MKL_Complex8(result, idty, 2, 2, tempstart, tempsize, tempsize);
     }
 
     tempsize = tempsize*2; // expand the working matrix
     assert(tempsize <= states);
     // copy tempend to tempstart to use next iteration, and zero tempend
     for (int ti=0; ti < states*states; ti++ ) {
-      tempstart[ti] = tempend[ti];
+      tempstart[ti] = result[ti];
       //tempend[ti] = (MKL_Complex8){0, 0};
     }
   } // end for kin in SPINS-3
 
   // return the result
-  for (int ti=0; ti < states*states; ti++ ) {
-    result[ti] = tempstart[ti];
-  }
+  // for (int ti=0; ti < states*states; ti++ ) {
+  //   result[ti] = tempstart[ti];
+  // }
 
   free(tempstart);
-  free(tempend);
+  //free(tempend);
 }
 
 
