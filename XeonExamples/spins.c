@@ -8,7 +8,8 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 2
+#define SPINS 12
+#define PRINT 0
 
 
 const MKL_Complex8 Sx[2*2] = {
@@ -103,8 +104,8 @@ int main() {
       assert(Snn[spin][dim] != NULL);
 
       SNN(Snn[spin][dim], spin, dim);
-      printf("state %d dim %d\n", spin, dim);
-      print_cmatrix("", states, states, Snn[spin][dim], states );
+      if (PRINT) printf("state %d dim %d\n", spin, dim);
+      if (PRINT) print_cmatrix("", states, states, Snn[spin][dim], states );
 
     }
   }
@@ -149,7 +150,7 @@ int main() {
     trace.imag += H[ti+states*ti].imag;
   }
   printf("trace of H is %f+i%f\n", trace.real, trace.imag);
-  print_cmatrix_noimag( "H", states, states, H, states);
+  if (PRINT) print_cmatrix_noimag( "H", states, states, H, states);
 
   for (spin=0; spin<SPINS; spin++)
     for (dim=0; dim<3; dim++) free(Snn[spin][dim]); // remove the spins matrixes
@@ -157,8 +158,8 @@ int main() {
   // find eigenvalues/vectors of H
   MKL_Complex8 *eigen = malloc( (states)*sizeof( MKL_Complex8 ));
 
-  MKL_Complex8 *eigen_real = malloc( (states)*sizeof( MKL_Complex8 ));
-  MKL_Complex8 *eigen_imag = malloc( (states)*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *eigen_real = malloc( states*states*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *eigen_imag = malloc( states*states*sizeof( MKL_Complex8 ));
 
   int info = LAPACKE_cgeev( LAPACK_ROW_MAJOR, //matrix Layout
     'N', // compute left eigenvectors
@@ -167,7 +168,7 @@ int main() {
     H, // matrix to eigensolve
     states, // lda
     eigen, // output for
-  NULL, 0, NULL, 0);
+  eigen_real, states, eigen_imag, states);
    // H is nonsense after this call, but we don't need it
   /* Check for convergence */
   if( info > 0 ) {
@@ -175,16 +176,5 @@ int main() {
           exit( 1 );
   }
   for (int eval = 0; eval<states; eval++) printf("%d eigenvalue is %f+i%f\n", eval, eigen[eval].real, eigen[eval].imag);
-
-  // MKL_Complex8 *tau = malloc( (states-1)*sizeof( MKL_Complex8 )); // Contains scalars that define elementary reflectors for the matrix Q.
-  // float *Q = malloc( states*states*sizeof( float )); // Contains scalars that define elementary reflectors for the matrix Q.
-  //
-  // int info = LAPACKE_cgehrd(LAPACK_ROW_MAJOR, states, 1, states, H, states, tau);
-  // assert(info == 0);
-  // int info = LAPACKE_sorghr(LAPACK_ROW_MAJOR, states, 1, states, H, tau, states, Q);
-  // assert(info == 0);
-
-
-  // calculate eigenstates etc
 
 }
