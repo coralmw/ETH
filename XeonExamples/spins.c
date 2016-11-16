@@ -8,8 +8,8 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 12
-#define PRINT 0
+#define SPINS 3
+#define PRINT 1
 
 
 const MKL_Complex8 Sx[2*2] = {
@@ -85,6 +85,35 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
   free(tempstart);
 }
 
+void SeperatedState(int system, int bath, float* state) {
+
+  // can Kron product with single value and it is identity
+  float* temp = malloc(states*sizeof(float));
+  assert(temp != NULL);
+
+  int spinUp;
+
+  float next[2];
+  int size = 1;
+  state[0] = 1;
+  int statesconsidered;
+
+  for (int bathspin = 0; bathspin<SPINS-1; bathspin++){
+    spinUp = bath & (1 << bathspin);
+    next[0] = spinUp==0 ? 1.0 : 0.0;
+    next[1] = spinUp==0 ? 0.0 : 1.0;
+    statesconsidered = pow(2, bathspin);
+
+    Kronecker_Product(temp, next, 1, 2, state, 1, statesconsidered);
+    for (int i=0; i<statesconsidered; i++) state[i] = temp[i];
+  }
+
+  // do the system state
+  next[0] = system==0 ? 1.0 : 0.0;
+  next[1] = system==0 ? 0.0 : 1.0;
+  Kronecker_Product(state, next, 1, 2, temp, 1, pow(2, SPINS));
+  free(temp);
+}
 
 
 int main() {
@@ -111,6 +140,24 @@ int main() {
   }
 
   printf( "calculating H\n" );
+
+  // Assign a initial state
+  MKL_Complex8 PSI[states];
+  for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){0,0};
+  PSI[0] = (MKL_Complex8){1,0};
+
+  // Generate all the states
+  float state[states];
+  for (int system = 0; system<2; system++ ){
+    for (int bath = 0; bath<states-2; bath++) {
+      SeperatedState(system, bath, state); // calculate the vector
+      if (PRINT) printf("state with system:%d bath%d\n", system, bath);
+      if (PRINT) {
+        for (int i=0;i<states;i++) printf("%f, ",state[i]);
+        printf("\n");
+      }
+    }
+  }
 
   MKL_Complex8 *H = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
 
@@ -158,23 +205,43 @@ int main() {
   // find eigenvalues/vectors of H
   MKL_Complex8 *eigen = malloc( (states)*sizeof( MKL_Complex8 ));
 
-  MKL_Complex8 *eigen_real = malloc( states*states*sizeof( MKL_Complex8 ));
-  MKL_Complex8 *eigen_imag = malloc( states*states*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *eigen_left = malloc( states*states*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *eigen_right = malloc( states*states*sizeof( MKL_Complex8 ));
 
-  int info = LAPACKE_cgeev( LAPACK_ROW_MAJOR, //matrix Layout
+  int info = LAPACKE_cgeev(
+    LAPACK_ROW_MAJOR, //matrix Layout
     'N', // compute left eigenvectors
     'V',// compute right eigenvectors
     states, // size of H
     H, // matrix to eigensolve
     states, // lda
     eigen, // output for
-  eigen_real, states, eigen_imag, states);
+    eigen_left, states, eigen_right, states
+  );
    // H is nonsense after this call, but we don't need it
   /* Check for convergence */
   if( info > 0 ) {
-          printf( "The algorithm failed to compute eigenvalues.\n" );
-          exit( 1 );
+    printf( "The algorithm failed to compute eigenvalues.\n" );
+    exit( 1 );
   }
   for (int eval = 0; eval<states; eval++) printf("%d eigenvalue is %f+i%f\n", eval, eigen[eval].real, eigen[eval].imag);
+
+  // create the eigenvalue matrix
+  // MKL_Complex8 *eigenvectors = malloc( states*states*sizeof( MKL_Complex8 ));
+  // for (int i=0; i<states; i++){
+  //   for (int j = 0; j<states; j++) {
+  //     eigenvectors[i+states*j].real = eigen_real[i+states*j];
+  //     eigenvectors[i+states*j].imag = eigen_imag[i+states*j];
+  //   }
+  // }
+
+  // for eigenvector in matrix, work out the dot of the PSI into it
+  MKL_Complex8 *basis_weights = malloc( states*states*sizeof( MKL_Complex8 ));
+  for (int i=0; i<states; i++){
+    const int one = 1;
+    cdotu(&basis_weights[i], &states, PSI, &one, &eigen_right[i], &states);
+    printf("coeff of %d th basis state: %f\n", i, basis_weights[i].real);
+  }
+
 
 }
