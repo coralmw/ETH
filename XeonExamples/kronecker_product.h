@@ -2,8 +2,8 @@
 #include "mkl_types.h"
 
 
-void Kronecker_Product(double *C, double *A, int nrows, int ncols,
-                                               double *B, int mrows, int mcols);
+void Kronecker_Product(float *C, float *A, int nrows, int ncols,
+                                               float *B, int mrows, int mcols);
 
 void Kronecker_Product_complex(complex *C, const complex *A, int nrows, int ncols,
                                               const complex *B, int mrows, int mcols);

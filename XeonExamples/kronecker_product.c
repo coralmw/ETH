@@ -78,13 +78,13 @@
 
 #include "kronecker_product.h"
 
-void Kronecker_Product(double *C, double *A, int nrows, int ncols,
-                                               double *B, int mrows, int mcols)
+void Kronecker_Product(float *C, float *A, int nrows, int ncols,
+                                               float *B, int mrows, int mcols)
 {
    int ccols, i, j, k, l;
    int block_increment;
-   double *pB;
-   double *pC, *p_C;
+   float *pB;
+   float *pC, *p_C;
 
    ccols = ncols * mcols;
    block_increment = mrows * ccols;
