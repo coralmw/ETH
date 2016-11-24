@@ -21,6 +21,8 @@ The Eigenstate Thermalisation Hypothesis attempts to bridge this gap by showing 
 
 # The density matrix and limiting our observations of a system
 
+In
+
 # Derivation of the reduced density matrix for a system-bath state
 
 Define the basis of system and bath in both the system and bath indexed states that are not a eigenbasis of the Hamiltonion and a singly indexed state of the eigenfunctions of H.

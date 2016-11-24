@@ -85,35 +85,64 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
   free(tempstart);
 }
 
+// void SeperatedState(int system, int bath, float* state) {
+//
+//   // can Kron product with single value and it is identity
+//   float* temp = malloc(states*sizeof(float));
+//   assert(temp != NULL);
+//
+//   int spinUp;
+//
+//   float next[2];
+//   int size = 1;
+//   state[0] = 1;
+//   int statesconsidered;
+//
+//   for (int bathspin = 0; bathspin<SPINS-1; bathspin++){
+//     spinUp = bath & (1 << bathspin);
+//     next[0] = spinUp==0 ? 1.0 : 0.0;
+//     next[1] = spinUp==0 ? 0.0 : 1.0;
+//     statesconsidered = pow(2, bathspin);
+//
+//     Kronecker_Product(temp, next, 1, 2, state, 1, statesconsidered);
+//     for (int i=0; i<statesconsidered; i++) state[i] = temp[i];
+//   }
+//
+//   // do the system state
+//   next[0] = system==0 ? 1.0 : 0.0;
+//   next[1] = system==0 ? 0.0 : 1.0;
+//   Kronecker_Product(state, next, 1, 2, temp, 1, pow(2, SPINS));
+//   free(temp);
+// }
+
 void SeperatedState(int system, int bath, float* state) {
 
   // can Kron product with single value and it is identity
-  float* temp = malloc(states*sizeof(float));
-  assert(temp != NULL);
-
-  int spinUp;
-
+  float tempstart[states];
+  float tempend[states];
   float next[2];
-  int size = 1;
-  state[0] = 1;
-  int statesconsidered;
+  int statesconsidered = 1;
+  int spinUp; // used each iteration to determine if this spin is up
+  tempstart[0] = 1.0; // if we only have one state, it must be in that state
+  for (int spin=0; spin<SPINS; spin++){
+    if (spin == SPINS-1) {
+      spinUp = bath & (1 << spin);
+      next[0] = spinUp==0 ? 1.0 : 0.0;
+      next[1] = spinUp==0 ? 0.0 : 1.0;
+    } else {
+      next[0] = system==0 ? 1.0 : 0.0;
+      next[1] = system==0 ? 0.0 : 1.0;
+    }
+    Kronecker_Product(tempend, next, 1, 2, tempstart, 1, statesconsidered);
+    statesconsidered*=2;
 
-  for (int bathspin = 0; bathspin<SPINS-1; bathspin++){
-    spinUp = bath & (1 << bathspin);
-    next[0] = spinUp==0 ? 1.0 : 0.0;
-    next[1] = spinUp==0 ? 0.0 : 1.0;
-    statesconsidered = pow(2, bathspin);
+    // copy to the start array so we can go again
+    for (int i=0; i<statesconsidered; i++) tempstart[i] = tempend[i];
+    }
 
-    Kronecker_Product(temp, next, 1, 2, state, 1, statesconsidered);
-    for (int i=0; i<statesconsidered; i++) state[i] = temp[i];
-  }
-
-  // do the system state
-  next[0] = system==0 ? 1.0 : 0.0;
-  next[1] = system==0 ? 0.0 : 1.0;
-  Kronecker_Product(state, next, 1, 2, temp, 1, pow(2, SPINS));
-  free(temp);
+  for (int i=0; i<states; i++) state[i] = tempend[i];
 }
+
 
 
 int main() {
@@ -224,6 +253,7 @@ int main() {
     printf( "The algorithm failed to compute eigenvalues.\n" );
     exit( 1 );
   }
+  free(H);
   for (int eval = 0; eval<states; eval++) printf("%d eigenvalue is %f+i%f\n", eval, eigen[eval].real, eigen[eval].imag);
 
   // create the eigenvalue matrix
@@ -242,6 +272,4 @@ int main() {
     cdotu(&basis_weights[i], &states, PSI, &one, &eigen_right[i], &states);
     printf("coeff of %d th basis state: %f\n", i, basis_weights[i].real);
   }
-
-
 }
