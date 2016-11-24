@@ -8,9 +8,10 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 3
-#define PRINT 1
+#define SPINS 8
+#define PRINT 0
 
+const int one = 1;
 
 const MKL_Complex8 Sx[2*2] = {
   {0,0}, {1,0},
@@ -85,55 +86,27 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
   free(tempstart);
 }
 
-// void SeperatedState(int system, int bath, float* state) {
-//
-//   // can Kron product with single value and it is identity
-//   float* temp = malloc(states*sizeof(float));
-//   assert(temp != NULL);
-//
-//   int spinUp;
-//
-//   float next[2];
-//   int size = 1;
-//   state[0] = 1;
-//   int statesconsidered;
-//
-//   for (int bathspin = 0; bathspin<SPINS-1; bathspin++){
-//     spinUp = bath & (1 << bathspin);
-//     next[0] = spinUp==0 ? 1.0 : 0.0;
-//     next[1] = spinUp==0 ? 0.0 : 1.0;
-//     statesconsidered = pow(2, bathspin);
-//
-//     Kronecker_Product(temp, next, 1, 2, state, 1, statesconsidered);
-//     for (int i=0; i<statesconsidered; i++) state[i] = temp[i];
-//   }
-//
-//   // do the system state
-//   next[0] = system==0 ? 1.0 : 0.0;
-//   next[1] = system==0 ? 0.0 : 1.0;
-//   Kronecker_Product(state, next, 1, 2, temp, 1, pow(2, SPINS));
-//   free(temp);
-// }
 
-void SeperatedState(int system, int bath, float* state) {
+void SeperatedState(int system, int bath, MKL_Complex8* state) {
 
   // can Kron product with single value and it is identity
-  float tempstart[states];
-  float tempend[states];
-  float next[2];
+  MKL_Complex8 tempstart[states];
+  MKL_Complex8 tempend[states];
+  MKL_Complex8 next[2];
+  for (int i=0; i<2; i++) next[i] = (MKL_Complex8){0,0};
   int statesconsidered = 1;
   int spinUp; // used each iteration to determine if this spin is up
-  tempstart[0] = 1.0; // if we only have one state, it must be in that state
+  tempstart[0] = (MKL_Complex8){1.0,0}; // if we only have one state, it must be in that state
   for (int spin=0; spin<SPINS; spin++){
     if (spin == SPINS-1) {
-      spinUp = bath & (1 << spin);
-      next[0] = spinUp==0 ? 1.0 : 0.0;
-      next[1] = spinUp==0 ? 0.0 : 1.0;
+      spinUp = bath & (1 << (spin-1) );
+      next[0].real = spinUp==0 ? 1.0 : 0.0;
+      next[1].real = spinUp==0 ? 0.0 : 1.0;
     } else {
-      next[0] = system==0 ? 1.0 : 0.0;
-      next[1] = system==0 ? 0.0 : 1.0;
+      next[0].real = system==0 ? 1.0 : 0.0;
+      next[1].real = system==0 ? 0.0 : 1.0;
     }
-    Kronecker_Product(tempend, next, 1, 2, tempstart, 1, statesconsidered);
+    Kronecker_Product_MKL_Complex8(tempend, next, 1, 2, tempstart, 1, statesconsidered);
     statesconsidered*=2;
 
     // copy to the start array so we can go again
@@ -173,16 +146,20 @@ int main() {
   // Assign a initial state
   MKL_Complex8 PSI[states];
   for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){0,0};
-  PSI[0] = (MKL_Complex8){1,0};
+  for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1./sqrt(4),0};
+  // PSI[3] = (MKL_Complex8){1.,0};
+
+  // PSI[3] = (MKL_Complex8){1./sqrt(4),0};
+  // PSI[0] = (MKL_Complex8){0,1./sqrt(2)};
 
   // Generate all the states
-  float state[states];
+  MKL_Complex8 state[states];
   for (int system = 0; system<2; system++ ){
     for (int bath = 0; bath<states-2; bath++) {
       SeperatedState(system, bath, state); // calculate the vector
       if (PRINT) printf("state with system:%d bath%d\n", system, bath);
       if (PRINT) {
-        for (int i=0;i<states;i++) printf("%f, ",state[i]);
+        for (int i=0;i<states;i++) printf("%f, ",state[i].real);
         printf("\n");
       }
     }
@@ -247,29 +224,65 @@ int main() {
     eigen, // output for
     eigen_left, states, eigen_right, states
   );
-   // H is nonsense after this call, but we don't need it
+  // H is nonsense after this call, but we don't need it
+  free(H);
+
   /* Check for convergence */
   if( info > 0 ) {
     printf( "The algorithm failed to compute eigenvalues.\n" );
     exit( 1 );
   }
-  free(H);
-  for (int eval = 0; eval<states; eval++) printf("%d eigenvalue is %f+i%f\n", eval, eigen[eval].real, eigen[eval].imag);
 
-  // create the eigenvalue matrix
-  // MKL_Complex8 *eigenvectors = malloc( states*states*sizeof( MKL_Complex8 ));
-  // for (int i=0; i<states; i++){
-  //   for (int j = 0; j<states; j++) {
-  //     eigenvectors[i+states*j].real = eigen_real[i+states*j];
-  //     eigenvectors[i+states*j].imag = eigen_imag[i+states*j];
-  //   }
-  // }
+  if (PRINT) {
+    for (int eval = 0; eval<states; eval++) {
+      printf("%d eigenvalue is %f+i%f ", eval, eigen[eval].real, eigen[eval].imag);
+      printf("with eigenevctor: ");
+      for (int i = 0; i<states; i++) printf("%f, ", eigen_right[i*states + eval].real);
+      printf("\n");
+    }
+  }
 
   // for eigenvector in matrix, work out the dot of the PSI into it
   MKL_Complex8 *basis_weights = malloc( states*states*sizeof( MKL_Complex8 ));
   for (int i=0; i<states; i++){
-    const int one = 1;
     cdotu(&basis_weights[i], &states, PSI, &one, &eigen_right[i], &states);
-    printf("coeff of %d th basis state: %f\n", i, basis_weights[i].real);
+    if (PRINT) printf("coeff of %d th basis state: %f\n", i, basis_weights[i].real);
   }
+
+  // calculate the reduced density matrix at t=0.
+  MKL_Complex8 rhoreduced[2*2];
+  MKL_Complex8 leftbraket, rightbraket;
+
+  MKL_Complex8 leftstate[states], rightstate[states];
+
+
+  for (int i=0; i<2; i++){
+    for (int j=0; j<2; j++){
+      rhoreduced[i*2+j].real = 0;
+      rhoreduced[i*2+j].imag = 0;
+      // sum over the number of system states
+      for (int n=0; n<2; n++) {
+        SeperatedState(i, n, leftstate); // calculate the vector of the system in the ith state and the bath in the nth state
+        SeperatedState(j, n, rightstate);
+
+        // then sum over all the bath states
+        for (int m=0; m<states; m++) {
+          cdotc(&leftbraket,  &states,  leftstate,        &one,    &eigen_right[m], &states);
+          for (int mp=0; mp<states; mp++) {
+            // cdotc takes the conj of the first vector
+            cdotc(&rightbraket, &states,  &eigen_right[mp], &states, rightstate,     &one);
+
+            rhoreduced[i*2+j].real += leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real;
+            rhoreduced[i*2+j].imag += leftbraket.imag * rightbraket.imag * basis_weights[m].real * (0-basis_weights[mp].imag);
+            if (PRINT>1) printf("dot product of the system:%d bath:%d state and the %d th eigenvector is %f with a state weight of %f\n", i, n, m, leftbraket.real, basis_weights[m].real * basis_weights[mp].real);
+            if (PRINT>1) printf("dot product of the system:%d bath:%d state and the %d th eigenvector is %f\n", j, n, mp, rightbraket.real);
+            if (PRINT>1) printf("rhoreduced[%d][%d]=%f\n", i, j, leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real);
+
+          }
+        }
+      }
+    }
+  }
+
+  print_cmatrix("rho-reduced:", 2, 2, rhoreduced, 2);
 }
