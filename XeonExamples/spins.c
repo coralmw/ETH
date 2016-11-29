@@ -10,6 +10,8 @@
 
 #define SPINS 3
 #define PRINT 2
+#define TSTEPS 1000
+#define DT 1
 
 const int one = 1;
 
@@ -121,8 +123,8 @@ int main() {
 
   // Assign a initial state
   MKL_Complex8 PSI[states];
-  // for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1.0/sqrt(states),0};
-  SeperatedState(0,1,PSI);
+  for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1.0/sqrt(states),0};
+  //SeperatedState(1,1,PSI);
   if (PRINT) {
     float norm = 0;
     for (int i = 0; i<states; i++) norm += pow(PSI[i].real, 2) + pow(PSI[i].imag, 2);
@@ -285,6 +287,8 @@ int main() {
 
   // calculate the reduced density matrix at t=0.
   MKL_Complex8 rhoreduced[2*2];
+  MKL_Complex8 time_evolution[TSTEPS][2*2];
+
   MKL_Complex8 leftbraket, rightbraket; // dot products stored in here
 
   MKL_Complex8 leftstate[states], rightstate[states];
@@ -309,6 +313,14 @@ int main() {
 
             rhoreduced[i*2+j].real += update.real;
             rhoreduced[i*2+j].imag += update.imag;
+
+            float t = 0;
+            for (int step = 0; step<TSTEPS; step++) {
+              complex energy = 0.0f + I*(eigen[m].real-eigen[mp].real)*t;
+              time_evolution[step][i*2+j].real += update.real * cexp(energy);
+              time_evolution[step][i*2+j].imag += update.imag * cexp(energy);
+              t += DT;
+            }
 
             if (PRINT>1 && cmul(update, update).real > 0.00001 ) {
               printf("n:%d m:%d mp:%d\n", n, m, mp);
