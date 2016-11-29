@@ -94,8 +94,6 @@ void SeperatedState(int system, int bath, MKL_Complex8* state) {
   for (int i=0; i<states; i++) state[i] = i == idx ? (MKL_Complex8){1.0,0.0} :  (MKL_Complex8){0.0,0.0};
 }
 
-
-
 int main() {
   printf( "Start SPINS\n" );
   states = pow(2,SPINS); // global scope
@@ -113,8 +111,8 @@ int main() {
       assert(Snn[spin][dim] != NULL);
 
       SNN(Snn[spin][dim], spin, dim);
-      if (PRINT) printf("state %d dim %d\n", spin, dim);
-      if (PRINT) print_cmatrix("", states, states, Snn[spin][dim], states );
+      //if (PRINT) printf("state %d dim %d\n", spin, dim);
+      //if (PRINT) print_cmatrix("", states, states, Snn[spin][dim], states );
 
     }
   }
@@ -123,9 +121,15 @@ int main() {
 
   // Assign a initial state
   MKL_Complex8 PSI[states];
-  for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){0,0};
+  // for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1.0/sqrt(states),0};
+  SeperatedState(0,1,PSI);
+  if (PRINT) {
+    float norm = 0;
+    for (int i = 0; i<states; i++) norm += pow(PSI[i].real, 2) + pow(PSI[i].imag, 2);
+    printf("norm^2 of state: %f\n", norm);
+  }
   // for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1./sqrt(4),0};
-  PSI[0] = (MKL_Complex8){1.,0};
+  // PSI[0] = (MKL_Complex8){1.,0};
 
   // PSI[3] = (MKL_Complex8){1./sqrt(4),0};
   // PSI[0] = (MKL_Complex8){0,1./sqrt(2)};
@@ -192,6 +196,13 @@ int main() {
   MKL_Complex8 *eigen_left = malloc( states*states*sizeof( MKL_Complex8 ));
   MKL_Complex8 *eigen_right = malloc( states*states*sizeof( MKL_Complex8 ));
 
+  // lapack_int LAPACKE_cgeev( int matrix_layout, char jobvl, char jobvr, lapack_int n,
+  // lapack_complex_float* a, lapack_int lda, lapack_complex_float* w, lapack_complex_float*
+  // vl, lapack_int ldvl, lapack_complex_float* vr, lapack_int ldvr );
+  // The i-th component of the j-th eigenvector vj
+  // is stored in vr[(i - 1)*ldvr + (j -
+  // 1)] for row major layout.
+
   int info = LAPACKE_cgeev(
     LAPACK_ROW_MAJOR, //matrix Layout
     'N', // compute left eigenvectors
@@ -202,7 +213,16 @@ int main() {
     eigen, // output for
     eigen_left, states, eigen_right, states
   );
+  // verified this does produce a complete set of vectors mutually orthogonal
+  // to 0.25% (mostly due to truncation when copying)
   // H is nonsense after this call, but we don't need it
+
+  // float *real_H = malloc(states*states*sizeof(float));
+  // MKL_Complex8 *eigen_right = malloc(states*states*sizeof(MKL_Complex8));
+  // for (int i = 0; i<states*states; i++) real_H[i]=H[i].real;
+  //
+  // int info = LAPACKE_ssyev( LAPACK_ROW_MAJOR, 'V', 'U', states, real_H, states, eigen );
+  // for (int i = 0; i<states*states; i++) eigen_right[i].real = real_H[i];
   free(H);
 
   /* Check for convergence */
@@ -215,7 +235,10 @@ int main() {
     for (int eval = 0; eval<states; eval++) {
       printf("%d eigenvalue is %f+i%f ", eval, eigen[eval].real, eigen[eval].imag);
       printf("with eigenevctor: ");
-      for (int i = 0; i<states; i++) printf("%f, ", eigen_right[i*states + eval].real);
+      for (int i = 0; i<states; i++) printf("%3.2f+i%3.2f, ", eigen_right[i*states + eval].real, eigen_right[i*states + eval].imag);
+      // printf("\nwith (left) eigenevctor: ");
+      //for (int i = 0; i<states; i++) printf("%f, ", eigen_left[i*states + eval].real);
+
       printf("\n");
 
       float norm = 0; // check the norm
@@ -225,11 +248,40 @@ int main() {
   }
 
   // for eigenvector in matrix, work out the dot of the PSI into it
-  MKL_Complex8 *basis_weights = malloc( states*states*sizeof( MKL_Complex8 ));
-  for (int i=0; i<states; i++){
-    cdotu(&basis_weights[i], &states, PSI, &one, &eigen_right[i], &states);
-    if (PRINT) printf("coeff of %d th basis state: %f\n", i, basis_weights[i].real);
+  MKL_Complex8 *basis_weights = malloc( states*sizeof( MKL_Complex8 ));
+  float basis_norm = 0;
+
+  for (int eval=0; eval<states; eval++){
+    // expression for the Ci'th weight is sum_ij <ij|psi><n|ij>
+    for (int s=0; s<2; s++){
+      for (int b=0; b<pow(2,SPINS-1); b++) {
+        MKL_Complex8 left, right;
+        MKL_Complex8 sbket[states];
+        SeperatedState(s, b, sbket); // get the ket
+        cdotc(&left, &states, sbket, &one, PSI, &one); // <ij|psi>
+        // print_cmatrix("eigenvalue considered:", states, 1, eigen_right[i], states);
+        // elements of eigen vector  for (int i = 0; i<states; i++) printf("%f, ", eigen_right[i*states + eval].real);
+        cdotc(&right, &states, &eigen_right[eval*states], &one, sbket, &one); // <n|ij>
+
+        if (PRINT>1 && cmul(left, right).real > 0.001) {
+          printf("updating basis[%d] with %f\n  from l:%3.2f r:%3.2f\n", eval, cmul(left, right).real, left.real, right.real);
+          printf("  sbket: "); for(int i=0;i<states;i++) printf("%3.2f, ", sbket[i].real); printf("\n");
+          printf("  PSI: "); for(int i=0;i<states;i++) printf("%3.2f, ", PSI[i].real); printf("\n");
+          printf("  eigen_right: "); for(int i=0;i<states;i++) printf("%3.2f, ", eigen_right[eval*states + i].real); printf("\n");
+        }
+        basis_weights[eval].real += cmul(left, right).real;
+        basis_weights[eval].imag += cmul(left, right).imag;
+      }
+    }
   }
+
+  print_cmatrix("weights matrix:", states, 1, basis_weights, states);
+
+  for (int i=0; i<states; i++) basis_norm += cmul(basis_weights[i], basis_weights[i]).real;
+  if (PRINT) {
+    printf("NORM of the basis (should be 1): %3.2f\n", sqrt(basis_norm));
+  }
+
 
   // calculate the reduced density matrix at t=0.
   MKL_Complex8 rhoreduced[2*2];
@@ -243,7 +295,7 @@ int main() {
       rhoreduced[i*2+j].real = 0;
       rhoreduced[i*2+j].imag = 0;
       // sum over the number of bath states to take the trace
-      for (int n=0; n<2; n++) {
+      for (int n=0; n<pow(2,SPINS-1); n++) {
         SeperatedState(i, n, leftstate); // calculate the vector of the system in the ith state and the bath in the nth state
         SeperatedState(j, n, rightstate);
 
@@ -253,16 +305,20 @@ int main() {
           for (int mp=0; mp<states; mp++) {
             // cdotc takes the conj of the first vector
             cdotc(&rightbraket, &states,  &eigen_right[mp], &states, rightstate,     &one);
+            MKL_Complex8 update = cmul(leftbraket, cmul(rightbraket, cmul(basis_weights[m], basis_weights[mp])));
 
-            rhoreduced[i*2+j].real += leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real;
-            rhoreduced[i*2+j].imag += leftbraket.imag * rightbraket.imag * basis_weights[m].real * (0.-basis_weights[mp].imag);
+            rhoreduced[i*2+j].real += update.real;
+            rhoreduced[i*2+j].imag += update.imag;
 
-            if (PRINT>1 && leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real != 0) printf("dot product of the system:%d bath:%d state and the %d th eigenvector is %f with a state weight of %f\n", i, n, m, leftbraket.real, basis_weights[m].real * basis_weights[mp].real);
-            if (PRINT>1 && leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real != 0) printf("rhoreduced[%d][%d]+=%f\n", i, j, leftbraket.real * rightbraket.real * basis_weights[m].real * basis_weights[mp].real);
+            if (PRINT>1 && cmul(update, update).real > 0.00001 ) {
+              printf("n:%d m:%d mp:%d\n", n, m, mp);
+              printf("update to rhoreduced[%d][%d]+=%f+i%f\n", i, j, update.real,update.imag);
+            }
 
           }
         }
       }
+      printf("\n\n\n");
     }
   }
 
