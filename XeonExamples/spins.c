@@ -8,7 +8,7 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define SPINS 2
+#define SPINS 6
 #define PRINT 2
 #define TSTEPS 1000
 #define DT 0.01
@@ -290,7 +290,8 @@ void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Co
     }
   }
 
-  MKL_Complex8 *H = (MKL_Complex8 *)malloc( states*states*sizeof( MKL_Complex8 ));
+  MKL_Complex8 *H = malloc( states*states*sizeof( MKL_Complex8 ));
+  // has to be complex as we construct it due to the SNN's being complex
 
   assert(H != NULL);
   for (int i = 0; i<states*states; i++) H[i] = (MKL_Complex8) {0, 0};
@@ -320,6 +321,9 @@ void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Co
     }
   }
 
+  for (spin=0; spin<SPINS; spin++)
+    for (dim=0; dim<3; dim++) free(Snn[spin][dim]); // remove the spins matrixes
+
   if (PRINT) {
     printf( " SPINS Example Program Results\n" );
     MKL_Complex8 trace = {0,0};
@@ -331,32 +335,22 @@ void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Co
      print_cmatrix_noimag( "H", states, states, H, states);
   }
 
-  // lapack_int LAPACKE_cgeev( int matrix_layout, char jobvl, char jobvr, lapack_int n,
-  // lapack_complex_float* a, lapack_int lda, lapack_complex_float* w, lapack_complex_float*
-  // vl, lapack_int ldvl, lapack_complex_float* vr, lapack_int ldvr );
-  // The i-th component of the j-th eigenvector vj
-  // is stored in vr[(i - 1)*ldvr + (j -
-  // 1)] for row major layout.
+  float *Hreal = malloc( states*states*sizeof( float ));
+  float *eigenvalues = malloc( states*sizeof( float ));
 
-  int info = LAPACKE_cgeev(
-    LAPACK_ROW_MAJOR, //matrix Layout
-    'N', // compute left eigenvectors
-    'V',// compute right eigenvectors
-    states, // size of H
-    H, // matrix to eigensolve
-    states, // lda
-    eigen, // output for
-    eigen_left, states, eigen_right, states
-  );
-  // verified this does produce a complete set of vectors mutually orthogonal
-  // to 0.25% (mostly due to truncation when copying)
-  /* Check for convergence */
+  for (int i=0; i<states*states; i++) Hreal[i] = H[i].real; // cast to real
+  free(H);
+
+  int info = LAPACKE_ssyevd( LAPACK_ROW_MAJOR, 'V', 'U', states, Hreal, states, eigenvalues );
+
   if( info > 0 ) {
     printf( "The algorithm failed to compute eigenvalues.\n" );
     exit( 1 );
   }
 
-  for (spin=0; spin<SPINS; spin++)
-    for (dim=0; dim<3; dim++) free(Snn[spin][dim]); // remove the spins matrixes
+  for (int i=0; i<states*states; i++) eigen_right[i].real = Hreal[i]; // back to complex for return
+  for (int i=0; i<states; i++) eigen[i].real = eigenvalues[i];
 
+  free(Hreal);
+  free(eigenvalues);
 }
