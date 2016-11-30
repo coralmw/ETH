@@ -9,7 +9,7 @@
 #include "tools.h"
 
 #define SPINS 2
-#define PRINT 0
+#define PRINT 2
 #define TSTEPS 1000
 #define DT 0.01
 
@@ -35,6 +35,22 @@ const MKL_Complex8 idty[2*2] = {
   {0,0}, {1,0}
 };
 
+
+void calculate_eigensystem_fake2spin(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Complex8 *eigen_right) {
+  float paireigen[4] = {-6, 2, 2, 2};
+  float pairvectors[4*4] = {
+    0, 1, 0, 0,
+    1/sqrt(2), 0, 1/sqrt(2), 0,
+    -1/sqrt(2), 0, 1/sqrt(2), 0,
+    0, 0, 0, 1
+  };
+
+
+  for (int i=0; i<4; i++) eigen[i].real = paireigen[i];
+  for (int i=0; i<4*4; i++) eigen_right[i].real = pairvectors[i];
+}
+
+
 const MKL_Complex8 *Sn[3] = {Sx, Sy, Sz};
 
 int states;
@@ -48,9 +64,20 @@ void SeperatedState(int system, int bath, MKL_Complex8* state) {
   for (int i=0; i<states; i++) state[i] = i == idx ? (MKL_Complex8){1.0,0.0} :  (MKL_Complex8){0.0,0.0};
 }
 
+void test_orth(const MKL_Complex8 *eigenvectors) {
+  MKL_Complex8 *orth = malloc(states*states*sizeof(MKL_Complex8));
+  for (int i=0; i<states; i++) {
+    for (int j=0; j<states; j++) {
+      cdotu(&orth[i*states+j], &states, &eigenvectors[i], &states, &eigenvectors[j], &states);
+    }
+  }
+  print_cmatrix("orthonormality of eigenvectors:", states, states, orth, states);
+}
+
 void weights_matrix(const MKL_Complex8 *eigenvectors, const MKL_Complex8 *PSI, MKL_Complex8 *basis_weights);
 
 void calculate_rhoreduced(const MKL_Complex8 *basis_weights, const MKL_Complex8 *eigenvectors, const MKL_Complex8 *eigenenergies, const float t, float *rhoreduced);
+
 void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Complex8 *eigen_right);
 
 
@@ -62,11 +89,20 @@ int main() {
 
   // Assign a initial state
   MKL_Complex8 PSI[states];
-  for (int i = 0; i<states; i++) PSI[i] = (MKL_Complex8){1.0/sqrt(states),0};
-  //SeperatedState(1,1,PSI);
+  MKL_Complex8 du[states]; SeperatedState(1,0,du);
+  MKL_Complex8 dd[states]; SeperatedState(1,1,dd);
+
+  for (int i=0; i<states; i++) {
+    PSI[i].real = (du[i].real);
+    PSI[i].imag = (0-dd[i].imag);
+  }
+
+  print_cmatrix("PSI", states, 1, PSI, states);
+
+
   if (PRINT) {
     float norm = 0;
-    for (int i = 0; i<states; i++) norm += cmul(PSI[i], PSI[i]).real;
+    for (int i = 0; i<states; i++) norm += cmag(PSI[i]);
     printf("norm^2 of state: %f\n", norm);
   }
 
@@ -76,6 +112,8 @@ int main() {
   MKL_Complex8 *eigen_right = malloc( states*states*sizeof( MKL_Complex8 ));
 
   calculate_eigensystem(eigen, eigen_left, eigen_right);
+
+  test_orth(eigen_right);
 
   if (PRINT) {
     for (int eval = 0; eval<states; eval++) {
@@ -93,7 +131,13 @@ int main() {
   // for eigenvector in matrix, work out the dot of the PSI into it
   MKL_Complex8 *basis_weights = malloc( states*sizeof( MKL_Complex8 ));
   weights_matrix(eigen_right, PSI, basis_weights);
-  print_cmatrix("weights matrix:", states, 1, basis_weights, states);
+
+  for (int i=0; i<states; i++) {
+    printf("weight %3.2f for state: (", basis_weights[i].real);
+    for (int j=0; j<states; j++) printf(" %3.2f,", eigen_right[i + j*states].real);
+    printf(")\n");
+  }
+  //print_cmatrix("weights matrix:", states, 1, basis_weights, states);
 
   float basis_norm = 0;
   for (int i=0; i<states; i++) basis_norm += cmul(basis_weights[i], basis_weights[i]).real;
@@ -124,30 +168,13 @@ int main() {
 
 }
 
+
 void weights_matrix(const MKL_Complex8 *eigenvectors, const MKL_Complex8 *PSI, MKL_Complex8 *basis_weights) {
-  float basis_norm = 0;
-  MKL_Complex8 left, right;
-  MKL_Complex8 sbket[states];
-
   for (int eval=0; eval<states; eval++){
-    // expression for the Ci'th weight is sum_ij <ij|psi><n|ij>
-    for (int s=0; s<2; s++){
-      for (int b=0; b<pow(2,SPINS-1); b++) {
-        SeperatedState(s, b, sbket); // get the ket
-        cdotc(&left, &states, sbket, &one, PSI, &one); // <ij|psi>
-        // print_cmatrix("eigenvalue considered:", states, 1, eigen_right[i], states);
-        // elements of eigen vector  for (int i = 0; i<states; i++) printf("%f, ", eigen_right[i*states + eval].real);
-        cdotc(&right, &states, &eigenvectors[eval*states], &one, sbket, &one); // <n|ij>
-
-        if (PRINT>1 && cmul(left, right).real > 0.001) {
-          printf("updating basis[%d] with %f\n  from l:%3.2f r:%3.2f\n", eval, cmul(left, right).real, left.real, right.real);
-          printf("  sbket: "); for(int i=0;i<states;i++) printf("%3.2f, ", sbket[i].real); printf("\n");
-          printf("  PSI: "); for(int i=0;i<states;i++) printf("%3.2f, ", PSI[i].real); printf("\n");
-          printf("  eigen_right: "); for(int i=0;i<states;i++) printf("%3.2f, ", eigenvectors[eval*states + i].real); printf("\n");
-        }
-        basis_weights[eval].real += cmul(left, right).real;
-        basis_weights[eval].imag += cmul(left, right).imag;
-      }
+    cdotc(&basis_weights[eval], &states, PSI, &one, &eigenvectors[eval], &states);
+    if (PRINT>1 && basis_weights[eval].real > 0.0001) {
+      printf("basis[%d] is %3.2f\n", eval,basis_weights[eval].real);
+      printf("  eigen_right: "); for(int i=0;i<states;i++) printf("%3.2f, ", eigenvectors[eval + i*states].real); printf("\n");
     }
   }
 }
@@ -181,7 +208,7 @@ void calculate_rhoreduced(const MKL_Complex8 *basis_weights, const MKL_Complex8 
             #pragma omp atomic
             rhoreduced[i*2+j] = rhoreduced[i*2+j] + update.real * cexp_MKL(expfactor);
 
-            if (PRINT>1 && cmul(update, update).real > 0.00001 ) {
+            if (PRINT>2 && cmul(update, update).real > 0.00001 ) {
               printf("n:%d m:%d mp:%d\n", n, m, mp);
               printf("update to rhoreduced[%d][%d]+=%f\n", i,j, update.real);
             }
@@ -241,20 +268,6 @@ void SNN(MKL_Complex8 *result, int spin, int dim){
 
   free(tempstart);
 }
-
-// void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Complex8 *eigen_right) {
-//   float paireigen[4] = {-6, 2, 2, 2};
-//   float pairvectors[4*4] = {
-//     0, 1, 0, 0,
-//     1/sqrt(2), 0, 1/sqrt(2), 0,
-//     -1/sqrt(2), 0, 1/sqrt(2), 0,
-//     0, 0, 0, 1
-//   };
-//
-//
-//   for (int i=0; i<4; i++) eigen[i].real = paireigen[i];
-//   for (int i=0; i<4*4; i++) eigen_right[i].real = pairvectors[i];
-// }
 
 void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Complex8 *eigen_right) {
 

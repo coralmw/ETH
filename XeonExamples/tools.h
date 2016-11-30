@@ -51,6 +51,10 @@ MKL_Complex8 cmul(MKL_Complex8 a, MKL_Complex8 b) {
                      };
 }
 
+float cmag(MKL_Complex8 a) {
+  return pow(a.real, 2)+pow(a.imag, 2);
+}
+
 
 float cexp_MKL(MKL_Complex8 v) {
   complex vprime = v.real + I*v.imag;
