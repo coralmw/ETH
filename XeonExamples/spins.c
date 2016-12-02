@@ -9,9 +9,9 @@
 #include "tools.h"
 
 #define SPINS 6
-#define PRINT 2
+#define PRINT 1
 #define TSTEPS 1000
-#define DT 0.01
+#define DT 0.001
 
 const int one = 1;
 
@@ -74,9 +74,11 @@ void test_orth(const MKL_Complex8 *eigenvectors) {
   print_cmatrix("orthonormality of eigenvectors:", states, states, orth, states);
 }
 
+
 void weights_matrix(const MKL_Complex8 *eigenvectors, const MKL_Complex8 *PSI, MKL_Complex8 *basis_weights);
 
 void calculate_rhoreduced(const MKL_Complex8 *basis_weights, const MKL_Complex8 *eigenvectors, const MKL_Complex8 *eigenenergies, const float t, float *rhoreduced);
+void calculate_rhoreduced_andsave(const MKL_Complex8 *basis_weights, const MKL_Complex8 *eigenvectors, const MKL_Complex8 *eigenenergies, MKL_Complex8 **rhoreduced);
 
 void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Complex8 *eigen_right);
 
@@ -91,13 +93,19 @@ int main() {
   MKL_Complex8 PSI[states];
   MKL_Complex8 du[states]; SeperatedState(1,0,du);
   MKL_Complex8 dd[states]; SeperatedState(1,1,dd);
+  MKL_Complex8 ddd[states]; SeperatedState(1,3,ddd);
+  MKL_Complex8 dddd[states]; SeperatedState(1,4,dddd);
 
-  for (int i=0; i<states; i++) {
-    PSI[i].real = (du[i].real);
-    PSI[i].imag = (0-dd[i].imag);
-  }
 
-  print_cmatrix("PSI", states, 1, PSI, states);
+  // for (int i=0; i<states; i++) PSI[i] = add_MKL(du[i], cmul((MKL_Complex8){0,1}, dd[i]));
+  for (int i=0; i<states; i++) PSI[i] =
+                                        add_MKL(du[i],
+                                        add_MKL(dd[i],
+                                        add_MKL(ddd[i],
+                                                dddd[i]
+                                        )));
+
+  if (PRINT) print_cmatrix("PSI", states, 1, PSI, states);
 
 
   if (PRINT) {
@@ -113,7 +121,7 @@ int main() {
 
   calculate_eigensystem(eigen, eigen_left, eigen_right);
 
-  test_orth(eigen_right);
+  // test_orth(eigen_right);
 
   if (PRINT) {
     for (int eval = 0; eval<states; eval++) {
@@ -130,41 +138,77 @@ int main() {
 
   // for eigenvector in matrix, work out the dot of the PSI into it
   MKL_Complex8 *basis_weights = malloc( states*sizeof( MKL_Complex8 ));
+  printf( "calculate weights\n" );
   weights_matrix(eigen_right, PSI, basis_weights);
 
-  for (int i=0; i<states; i++) {
-    printf("weight %3.2f for state: (", basis_weights[i].real);
-    for (int j=0; j<states; j++) printf(" %3.2f,", eigen_right[i + j*states].real);
-    printf(")\n");
+  if (PRINT) {
+    for (int i=0; i<states; i++) {
+      printf("weight (%3.2f,%3.2f) for state: (", basis_weights[i].real, basis_weights[i].imag);
+      for (int j=0; j<states; j++) printf(" %3.2f,", eigen_right[i + j*states].real);
+      printf(")\n");
+    }
   }
   //print_cmatrix("weights matrix:", states, 1, basis_weights, states);
 
   float basis_norm = 0;
-  for (int i=0; i<states; i++) basis_norm += cmul(basis_weights[i], basis_weights[i]).real;
+  for (int i=0; i<states; i++) basis_norm += cmag(basis_weights[i]);
   if (PRINT) {
     printf("NORM of the basis (should be 1): %3.2f\n", sqrt(basis_norm));
   }
 
   // calculate the reduced density matrix at t=0.
-  float rhoreduced[2*2];
-  calculate_rhoreduced(basis_weights, eigen_right, eigen, 0.0, rhoreduced);
 
-  print_fmatrix("rho-reduced:", 2, 2, rhoreduced, 2);
+  MKL_Complex8 *rhoreduced[2*2];
+  for (int i=0; i<4; i++) {
+    rhoreduced[i] = malloc(TSTEPS*sizeof(MKL_Complex8));
+    for (int j=0; j<TSTEPS; j++) rhoreduced[i][j] = (MKL_Complex8){0,0};
+    assert(rhoreduced[i] != NULL);
+  }
 
-  FILE *upup, *downdown;
+  printf( "calculate rhoreduced for all t\n" );
+
+  calculate_rhoreduced_andsave(basis_weights, eigen_right, eigen, rhoreduced);
+
+  FILE *upup, *downdown, *updown, *downup;
   upup = fopen("results/upup", "w");
   downdown = fopen("results/downdown", "w");
+  updown = fopen("results/updown", "w");
+  downup = fopen("results/downup", "w");
 
-  float t = 0;
-  for (int ti = 0; ti<TSTEPS; ti++) {
-    calculate_rhoreduced(basis_weights, eigen_right, eigen, t, rhoreduced);
-    if (rhoreduced[0] > 1 || rhoreduced[3] > 1) print_fmatrix("What went wrong", 2, 2, rhoreduced, 2);
-    fprintf(upup, "%f ", rhoreduced[0]);
-    fprintf(downdown, "%f ", rhoreduced[3]);
-    t += DT;
+  if (upup == NULL || downdown == NULL || updown == NULL || downup == NULL) {
+    printf("file open fail!\n");
+    exit(1);
   }
-  fclose(upup);
-  fclose(downdown);
+
+  printf( "saving rhoreduced\n" );
+
+
+  for (int tstep=0; tstep<TSTEPS; tstep++){
+    if (rhoreduced[0][tstep].real > 1.1) printf("wtf at t %d", tstep);
+    fprintf(upup, "%f ", rhoreduced[0][tstep].real);
+    fprintf(downdown, "%f ", rhoreduced[3][tstep].real);
+    fprintf(updown, "%f ", rhoreduced[1][tstep].real);
+    fprintf(downup, "%f ", rhoreduced[2][tstep].real);
+  }
+
+  // calculate_rhoreduced(basis_weights, eigen_right, eigen, 0.0, rhoreduced);
+  //
+  // print_fmatrix("rho-reduced:", 2, 2, rhoreduced, 2);
+  //
+  // FILE *upup, *downdown;
+  // upup = fopen("results/upup", "w");
+  // downdown = fopen("results/downdown", "w");
+  //
+  // float t = 0;
+  // for (int ti = 0; ti<TSTEPS; ti++) {
+  //   calculate_rhoreduced(basis_weights, eigen_right, eigen, t, rhoreduced);
+  //   if (rhoreduced[0] > 1 || rhoreduced[3] > 1) print_fmatrix("What went wrong", 2, 2, rhoreduced, 2);
+  //   fprintf(upup, "%f ", rhoreduced[0]);
+  //   fprintf(downdown, "%f ", rhoreduced[3]);
+  //   t += DT;
+  // }
+  // fclose(upup);
+  // fclose(downdown);
 
 }
 
@@ -179,20 +223,66 @@ void weights_matrix(const MKL_Complex8 *eigenvectors, const MKL_Complex8 *PSI, M
   }
 }
 
+
+void calculate_rhoreduced_andsave(const MKL_Complex8 *basis_weights, const MKL_Complex8 *eigenvectors, const MKL_Complex8 *eigenenergies, MKL_Complex8 **rhoreduced) {
+  int numbath = pow(2,SPINS-1);
+
+  for (int i=0; i<2; i++){ // elements of the rho-reduced matrix
+    for (int j=0; j<2; j++){
+      // sum over the number of bath states to take the trace
+      #pragma omp parallel for
+      for (int n=0; n<numbath; n++) {
+        MKL_Complex8 update, expfactor;
+        MKL_Complex8 leftbraket, rightbraket; // dot products stored in here
+        MKL_Complex8 leftstate[states], rightstate[states];
+        SeperatedState(i, n, leftstate); // calculate the vector of the system in the ith state and the bath in the nth state
+        SeperatedState(j, n, rightstate);
+
+        // then sum over all the bath states
+        for (int m=0; m<states; m++) {
+          cdotc(&leftbraket,  &states,  leftstate,        &one,    &eigenvectors[m], &states);
+          for (int mp=0; mp<states; mp++) {
+            // cdotc takes the conj of the first vector
+            cdotc(&rightbraket, &states,  &eigenvectors[mp], &states, rightstate,     &one);
+            update = cmul(leftbraket, cmul(rightbraket, cmul(basis_weights[m], conj_MKL(basis_weights[mp]))));
+
+            float t = 0;
+            for (int tstep=0; tstep<TSTEPS; tstep++){
+              expfactor = (MKL_Complex8){0, (eigenenergies[mp].real-eigenenergies[m].real)*t};
+
+              #pragma omp atomic
+              rhoreduced[i*2+j][tstep].real += update.real * cexp_MKL(expfactor);
+              #pragma omp atomic
+              rhoreduced[i*2+j][tstep].imag += update.imag * cexp_MKL(expfactor);
+
+              t+=DT;
+            }
+
+            if (PRINT>2 && cmul(update, update).real > 0.00001 ) {
+              printf("n:%d m:%d mp:%d\n", n, m, mp);
+              printf("update to rhoreduced[%d][%d]+=%f\n", i,j, update.real);
+            }
+
+          }
+        }
+      }
+    }
+  }
+}
+
+
 void calculate_rhoreduced(const MKL_Complex8 *basis_weights, const MKL_Complex8 *eigenvectors, const MKL_Complex8 *eigenenergies, const float t, float *rhoreduced) {
-  float time_evolution[2*2][TSTEPS];
+  int numbath = pow(2,SPINS-1);
 
-  MKL_Complex8 leftbraket, rightbraket; // dot products stored in here
-  MKL_Complex8 leftstate[states], rightstate[states];
-
-  int i, j, n;
-  MKL_Complex8 update, expfactor;
-  // #pragma omp parallel for private(i,j,n,update, expfactor,leftbraket, rightbraket)
-  for (i=0; i<2; i++){ // elements of the rho-reduced matrix
-    for (j=0; j<2; j++){
+  for (int i=0; i<2; i++){ // elements of the rho-reduced matrix
+    for (int j=0; j<2; j++){
       rhoreduced[i*2+j] = 0;
       // sum over the number of bath states to take the trace
-      for (int n=0; n<pow(2,SPINS-1); n++) {
+      #pragma omp parallel for
+      for (int n=0; n<numbath; n++) {
+        MKL_Complex8 update, expfactor;
+        MKL_Complex8 leftbraket, rightbraket; // dot products stored in here
+        MKL_Complex8 leftstate[states], rightstate[states];
         SeperatedState(i, n, leftstate); // calculate the vector of the system in the ith state and the bath in the nth state
         SeperatedState(j, n, rightstate);
 
@@ -293,6 +383,8 @@ void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Co
   MKL_Complex8 *H = malloc( states*states*sizeof( MKL_Complex8 ));
   // has to be complex as we construct it due to the SNN's being complex
 
+  printf( "calculating H\n" );
+
   assert(H != NULL);
   for (int i = 0; i<states*states; i++) H[i] = (MKL_Complex8) {0, 0};
   int startspin;
@@ -340,6 +432,8 @@ void calculate_eigensystem(MKL_Complex8 *eigen, MKL_Complex8 *eigen_left, MKL_Co
 
   for (int i=0; i<states*states; i++) Hreal[i] = H[i].real; // cast to real
   free(H);
+
+  printf( "eigensolve\n" );
 
   int info = LAPACKE_ssyevd( LAPACK_ROW_MAJOR, 'V', 'U', states, Hreal, states, eigenvalues );
 
