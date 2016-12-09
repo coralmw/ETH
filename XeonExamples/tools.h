@@ -60,3 +60,11 @@ float cexp_MKL(MKL_Complex8 v) {
   complex vprime = v.real + I*v.imag;
   return cexp(vprime);
 }
+
+MKL_Complex8 conj_MKL(MKL_Complex8 v){
+  return (MKL_Complex8){v.real, 0.0-v.imag};
+}
+
+MKL_Complex8 add_MKL(MKL_Complex8 l, MKL_Complex8 r){
+  return (MKL_Complex8){l.real+r.real, l.imag+r.imag};
+}
