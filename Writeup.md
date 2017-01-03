@@ -59,9 +59,91 @@ $$
 $$
 
 
+# Optimising the performance of the reduced density calculation.
 
+We can define several relevent basisies for this problem as the eigensystems for a selection of Hamiltonions, a completely seperated basis where no interactions are considered, a system with the system fully connected except for the links connecting the subsystem we mesure and the bath, and a fully connected system that we wish to probe.
 
+The seperated basis can be trivally defined as the hamitionion is diagonal as the outer prodcut of the constituitant states. In bra-ket notation this is given by
 
+$$
+\ket{S_{1}S_{2}\dots S_{n}} =  \ket{S_{1}}\ket{S_{2}}\dots\ket{S_{n}}
+$$
+
+And in the repreantation where a up-spin is given by $(1, 0)^{T}$ and down by $(0, 1)^{T}$, this a one-hot encoding[@digdesign] of the state, in a vector of length $2^n$ where n is the number of sites.
+
+$$
+\ket{S_{1}S_{2}\dots S_{n}} = \begin{pmatrix}S_{1-up}\\S_{1-down}\end{pmatrix} \otimes \begin{pmatrix}S_{2-up}\\S_{2-down}\end{pmatrix} \dots \otimes \begin{pmatrix}S_{n-up}\\S_{n-down}\end{pmatrix}
+$$
+
+The represntations of the states in the system-bath basis and fully combined basis cannot be defined without referance to the hamiltionion discribing the system, and in general any system-bath state $\ket{SB}$ or totally combined state $\ket{N}$ will be formed as a linear combination of all of the seperated basis states. We are allways able to form the more complex basis as a function of the seperated basis states as the seperated basis is complete.
+
+As this seperated basis is easy to define, we will use it as the computational basis and all hamiltionions will be defined numerically in this basis. This leads to the more-connected systems having non-diagonal representations, due to the calcualtion proceedure using the interaction terms in the seperated basis.
+
+We can't find operators that would allow us to represent both the energy of the states and the interaction terms that are diagonal in the same basis, so may as well use the clearest.
+
+howevver in order to diagonalize them without diagonal operators it is required to calculate a concrete eigensystem and this is exactly the compuational process needed to find represenations in the seperated basis, so we can take the seperated basis as our only basis for concrete representations.
+
+In order to directly calculate the reduced density matrix for the combined system, we calculate many expressions of the form
+
+$$
+\sum_{n}\sum_{m} \bra{S_{1}B_{n}}\ket{m}
+$$
+
+We can interpret this as looking up the $(S_{1}B_{n}, m)$th element of a matrix we call X.
+
+ We define X to be a lookup table for the overlaps bwteen the fully seperated states we wish to find the reduced density matrix in and the combined states.
+
+$$
+X[SB, m] = \bra{S_1 S_2 \dots S_n}\ket{m}
+$$
+
+If we form the matricies $[\ket{S_1 S_2 \dots S_n}]$ and $[\ket{m}]$, where the square brackets indicate the matrix of eigenvectors. For example,
+
+$$
+[\ket{S_1 S_2 \dots S_n}] = [\ket{00}, \ket{01}, \dots, \ket{nn}]
+$$
+
+Using this, we can efiicently calculate the overlaps bwteen all the states using a single matrix product.
+
+$$
+X = [\ket{S_1 S_2 \dots S_n}]\cdot[\ket{m}]
+$$
+
+As a conventional matrix product, this can be calculated efficently. In order to compute the reduced density matrix, we lookup the multiplicative overlap values from this matrix.
+
+$$
+\hat{\rho}^{\text{reduced}}_{S_1,S_2} = \sum_{n} \sum_{mm'} X[S_{1}B_{n}, m] X[S_{2}B_{n}, m']^{\star} C_{m}C^{\star}_{m'} e^{\frac{-i (E_{m}-E_{m'})t}{\hbar}}
+$$
+
+This however still results in a very large number of nested loops in order to calculate the reduced density matrix. As a alternative, we return to the definition of the full density matrix and calculate it for the time dependant state, and take the partial trace directly.
+
+$$
+\hat{\rho} = \ket{\psi}\bra{\psi} = \sum_{mm'} C_{m}C^{\star}_{m'} e^{\frac{-i (E_{m}-E_{m'})t}{\hbar}} \ket{m}\bra{m'}
+$$
+
+We define the partial trace as the trace over the bath states, with the states expanded using the identity oparators for the system portion.
+
+$$
+Tr_{b}(\hat{O}) = \sum_{b} (\mathbb{I}_{system} \otimes \bra{b})\hat{O}(\ket{b} \otimes \mathbb{I}_{system})
+$$
+$$
+Tr_{b}(\hat{\rho}) = \sum_{b}\sum_{mm'} (\mathbb{I}_{system} \otimes \bra{b}) \ket{m}\bra{m'}(\ket{b} \otimes \mathbb{I}_{system}) C_{m}C^{\star}_{m'} e^{\frac{-i (E_{m}-E_{m'})t}{\hbar}}
+$$
+
+We can then calculate the reduced density matrix in the seperated basis with
+
+$$
+\rho^{\text{reduced}}_{S_1,S_2} = \bra{S_1}Tr_{b}(\hat{\rho})\ket{S_2}
+$$
+$$
+\rho^{\text{reduced}} = [System Eigenvectors]^\dagger\cdot Tr_{b}(\hat{\rho})\cdot [System Eigenvectors]
+$$
+
+The advantage of this approch is each of the stages has at worst a 2-level nesting of summations. This indicates that this form of calculation (deteriming full density matrix, taking partial trace, and expressing in chosen basis) avoids needless recomputation of values relative to the fully nested calculation that has 6 levels of summation.
+
+The disadvantage is as the time-dependance is factored into the full density matrix, we need to fully recalculate for each timestep we sample at. The system at T+dt can be calculated without knowlage of the system at T, so can be done in parallel.
+
+TEST what is faster.  
 
 #States
 
@@ -242,6 +324,7 @@ CombinedCoeffs = Table[Dot[phi, CombinedStates[[k]]], {k, NoStates}];
 p = Simplify[
    ArrayFlatten[Table[Table[\[Rho][s1, s2], {s1, 0, 1}], {s2, 0, 1}]]];
 ~~~~~~~~
+
 
 # Introduction to the Xeon Phi
 
