@@ -9,7 +9,7 @@
 #include "kronecker_product.h"
 #include "tools.h"
 
-#define NBATH 6
+#define NBATH 2
 #define NSYS  2
 #define PRINT 1
 #define TSTEPS 1000
@@ -39,74 +39,104 @@ const MKL_Complex8 *Sn[3] = {Sx, Sy, Sz};
 
 int states;
 
-void test_orth(const MKL_Complex8 *eigenvectors) {
-  MKL_Complex8 *orth = malloc(states*states*sizeof(MKL_Complex8));
-  for (int i=0; i<states; i++) {
-    for (int j=0; j<states; j++) {
-      cdotu(&orth[i*states+j], &states, &eigenvectors[i], &states, &eigenvectors[j], &states);
+void test_orth(int size, const float *eigenvectors) {
+  float *orth = malloc(size*size*sizeof(float));
+  for (int i=0; i<size; i++) {
+    for (int j=0; j<size; j++) {
+      orth[i*size+j] = sdot(&size, &eigenvectors[i], &size, &eigenvectors[j], &size);
     }
   }
-  print_cmatrix("orthonormality of eigenvectors:", states, states, orth, states);
+  print_fmatrix("orthonormality of eigenvectors:", size, size, orth, size);
+  free(orth);
 }
 
 void pauliposn(int n, int dim, int spins, MKL_Complex8 *result);
-void HfromConnectivityMatrix(int size, float* J, MKL_Complex8 *result);
+void HfromConnectivityMatrix(int size, float* J, float *result);
+void eigensolveH(int size, float* H, float *Energy);
+void reduceddensityEnergyBasis(float t, float *BathStates, float* SystemStates, float* SystemEnergies)
 
 int main(int argc, char **argv) {
   printf( "Start SPINS\n" );
-  states = pow(2,SPINS); // global scope
-
-  if (PRINT) printf("open results files");
-  FILE *results, *eigenfile;
-  char *filename = argc >= 2 ? argv[1] : "results";
-  char eignfilename[50];
-  strcpy(eignfilename, argv[1]);
-  strcat(eignfilename, "_eigenvalues");
-  results = fopen(filename, "w");
-  eigenfile = fopen(eignfilename, "w");
-
-  if (results == NULL || eigenfile == NULL) {
-    printf("file open fail!\n");
-    exit(1);
-  }
-
-
-    printf( "calculating H\n" );
-
-
-  printf( "saving eigen\n" );
-  for (int i=0; i<pow(2,NSYS); i++) fprintf(eigenfile, "%f ", eigen[i].real);
-
-  printf( "saving rhoreduced\n" );
-  for (int i=0; i<pow(2,NSYS); i++) {
-    for (int j=0; j<pow(2,NSYS); j++) {
-      fprintf(results, "%d %d ", i, j);
-      for (int tstep=0; tstep<TSTEPS; tstep++){
-        if (rhoreduced[i*systemstates+j][tstep].real > 1.1) printf("wtf at t %d\n", tstep);
-        fprintf(results, "%f ", rhoreduced[i*systemstates+j][tstep].real);
-      }
-      fprintf(results, "\n");
-    }
-  }
-
-  // calculate_rhoreduced(basis_weights, eigen_right, eigen, 0.0, rhoreduced);
+  states = pow(2,NSYS+NBATH); // global scope
+  int matrixsize = pow(2, (NSYS+NBATH)*2);
   //
-  // print_fmatrix("rho-reduced:", 2, 2, rhoreduced, 2);
+  // if (PRINT) printf("open results files");
+  // FILE *results, *eigenfile;
+  // char *filename = argc >= 2 ? argv[1] : "results";
+  // char eignfilename[50];
+  // strcpy(eignfilename, argv[1]);
+  // strcat(eignfilename, "_eigenvalues");
+  // results = fopen(filename, "w");
+  // eigenfile = fopen(eignfilename, "w");
   //
-  // FILE *upup, *downdown;
-  // upup = fopen("results/upup", "w");
-  // downdown = fopen("results/downdown", "w");
-  //
-  // float t = 0;
-  // for (int ti = 0; ti<TSTEPS; ti++) {
-  //   calculate_rhoreduced(basis_weights, eigen_right, eigen, t, rhoreduced);
-  //   if (rhoreduced[0] > 1 || rhoreduced[3] > 1) print_fmatrix("What went wrong", 2, 2, rhoreduced, 2);
-  //   fprintf(upup, "%f ", rhoreduced[0]);
-  //   fprintf(downdown, "%f ", rhoreduced[3]);
-  //   t += DT;
+  // if (results == NULL || eigenfile == NULL) {
+  //   printf("file open fail!\n");
+  //   exit(1);
   // }
-  // fclose(upup);
-  // fclose(downdown);
+  printf( "creating J\n" );
+
+  float *Jsep, *Jcon;
+  Jsep = malloc(pow(2, NSYS+NBATH) * sizeof(float));
+  Jcon = malloc(pow(2, NSYS+NBATH) * sizeof(float)); // we also wuse this matrix for the BATH, SYS J
+  if (Jsep == NULL || Jcon == NULL) exit(1);
+  memset(Jsep, 0, sizeof Jsep);
+  memset(Jcon, 0, sizeof Jcon);
+
+  for (int i=0; i<NSYS+NBATH; i++) { // along the line above the diagonal
+    if (i != NSYS-1) Jsep[i + (NSYS+NBATH)*(i+1)] = 1; // all but the system-bath link connected
+  }
+
+  for (int i=0; i<NSYS+NBATH-1; i++) { // along the line above the diagonal
+    Jcon[i + (NSYS+NBATH)*(i+1)] = 1;  // all connected
+  }
+  Jcon[(NSYS+NBATH-1)*(NSYS+NBATH)] = 1; // connection from last bath to first system - topright.
+
+  print_fmatrix("sep J matrix", NSYS+NBATH, NSYS+NBATH, Jsep, NSYS+NBATH);
+
+  float *Hsep = malloc(matrixsize*sizeof(float));
+  float *Hcon = malloc(matrixsize*sizeof(float));
+  float *Hsys = malloc(pow(2, NSYS*2)*sizeof(float));
+  float *Hbath = malloc(pow(2, NBATH*2)*sizeof(float));
+
+  printf( "calculating H\n" );
+
+  HfromConnectivityMatrix(NSYS+NBATH, Jsep, Hsep);
+  HfromConnectivityMatrix(NSYS+NBATH, Jcon, Hcon);
+  HfromConnectivityMatrix(NSYS, Jcon, Hsys); // The system and bath are  fully connected in the ring model
+  HfromConnectivityMatrix(NBATH, Jcon, Hbath); // The system and bath are  fully connected in the ring model
+
+  // print_fmatrix("Hsep", states, states, Hsep, states);
+
+  printf( "calculating Eigensystems\n" );
+
+
+  float *EigenEsep = malloc(matrixsize*sizeof(float));
+  float *EigenEcon = malloc(matrixsize*sizeof(float));
+  float *EigenEsys = malloc(pow(2, NSYS)*sizeof(float));
+  float *EigenEbath = malloc(pow(2, NSYS)*sizeof(float));
+
+  // eigenvectors overwrite the hamiltion passed in, but we don't need H anymore
+  eigensolveH(NSYS+NBATH, Hsep, EigenEsep);
+  eigensolveH(NSYS+NBATH, Hcon, EigenEcon);
+  eigensolveH(NSYS, Hsys, EigenEsys);
+  eigensolveH(NBATH, Hbath, EigenEbath);
+
+  float *EigenVsep = Hsep;
+  print_fmatrix("eigenvectors of Hsep", states, states, EigenVsep, states);
+  test_orth(pow(2, NSYS+NBATH), EigenVsep);
+
+  float *EigenVcon = Hcon;
+  float *EigenVsys = Hsys;
+  float *EigenVbath = Hbath;
+
+  test_orth(pow(2, NSYS+NBATH), EigenVcon);
+
+  MKL_Complex8 *Phi = malloc(pow(2, NSYS+NBATH)*sizeof(MKL_Complex8));
+  memset(Phi, 0, sizeof(Phi));
+
+  for (int i=0; i<pow(2, NSYS+NBATH); i++) Phi[i].real = EigenVsep[2 + i*states];
+  print_cmatrix_noimag("Phi inital", pow(2, NSYS+NBATH), 1, Phi, pow(2, NSYS+NBATH));
+
 
 }
 
@@ -116,21 +146,14 @@ void pauliposn(int n, int dim, int spins, MKL_Complex8 *result){
   // as we can only do one at once, we need a loop with spins-1 iterations
   // we use result to hold intermediate results as we know it's big enough
   // we start from the final matrix and work back.
-  int size = pow(2, spins);
-  MKL_Complex8 *tempstart = malloc( size*sizeof( MKL_Complex8 ));
-  if (tempstart == NULL) {
-    exit(-1);
-  }
 
-  for (int ti=0; ti < size; ti++ ) {
-    tempstart[ti] = (MKL_Complex8){0, 0};
-    result[ti] = (MKL_Complex8){0, 0};
-  }
+  int size = pow(2, spins*2);
+  MKL_Complex8 *temp = malloc(size*sizeof(MKL_Complex8));
 
   // construct the end of the product chain. make sure to include the pauli matirx if needed
-  if (n == spins-1) Kronecker_Product_MKL_Complex8(tempstart, idty, 2, 2, Sn[dim], 2, 2);
-  if (n == spins-2) Kronecker_Product_MKL_Complex8(tempstart, Sn[dim], 2, 2, idty, 2, 2);
-  if (n <  spins-2) Kronecker_Product_MKL_Complex8(tempstart, idty, 2, 2, idty, 2, 2);
+  if (n == spins-1) Kronecker_Product_MKL_Complex8(temp, idty, 2, 2, Sn[dim], 2, 2);
+  if (n == spins-2) Kronecker_Product_MKL_Complex8(temp, Sn[dim], 2, 2, idty, 2, 2);
+  if (n <  spins-2) Kronecker_Product_MKL_Complex8(temp, idty, 2, 2, idty, 2, 2);
 
   int tempsize = 4;
 
@@ -138,59 +161,88 @@ void pauliposn(int n, int dim, int spins, MKL_Complex8 *result){
     //printf("kron product for iteration %d, tempsize is %d out of %d\n", ki, tempsize, states);
     // we need to do it from the outside first, and allocate a matrix to hold the temp result.
 
-    if (spin == ki){
-      Kronecker_Product_MKL_Complex8(result, Sn[dim], 2, 2, tempstart, tempsize, tempsize);
+    if (n == ki){
+      Kronecker_Product_MKL_Complex8(result, Sn[dim], 2, 2, temp, tempsize, tempsize);
     } else {
-      Kronecker_Product_MKL_Complex8(result, idty, 2, 2, tempstart, tempsize, tempsize);
+      Kronecker_Product_MKL_Complex8(result, idty, 2, 2, temp, tempsize, tempsize);
     }
 
     tempsize = tempsize*2; // expand the working matrix
     assert(tempsize <= states);
     // copy tempend to tempstart to use next iteration, and zero tempend
     for (int ti=0; ti < size; ti++ ) {
-      tempstart[ti] = result[ti];
+      temp[ti] = result[ti];
     }
   } // end for kin in spins-2
 
   // return the result
   for (int ti=0; ti < size; ti++ ) {
-    result[ti] = tempstart[ti];
+    result[ti] = temp[ti];
   }
-
-  free(tempstart);
+  free(temp);
 }
 
-void HfromConnectivityMatrix(int spins, float* J, MKL_Complex8 *result){
+void HfromConnectivityMatrix(int spins, float* J, float *result){
 
-  int size = pow(2, spins);
+  int size = pow(2, spins*2);
+  int dimsize = pow(2, spins);
   MKL_Complex8 *left, *right;
+
   left = malloc(size*sizeof(MKL_Complex8));
   right = malloc(size*sizeof(MKL_Complex8));
 
-  for (int i=0; i<spins; i++){
-    for (int j = 0; j<spins; j++){
-      for (int dim = 1; dim <= 3; dim++) {
-        if (J[i*spins*j] != 0) {
-          pauliposn(i, dim, spins, left);
+  // has to be complex here as the pauli matrix in the y-direction is complex
+  MKL_Complex8 *HcomplexTemp = malloc(size*sizeof(MKL_Complex8));
+  memset(HcomplexTemp, 0, sizeof(HcomplexTemp));
+
+  if (left == NULL || right == NULL || HcomplexTemp == NULL) {
+    printf("error alloc matrix\n");
+    exit(2);
+  }
+  for (int dim = 0; dim < 3; dim++) {
+    for (int i=0; i<spins; i++){
+      memset(left, 0, sizeof(left));
+      pauliposn(i, dim, spins, left);
+
+      for (int j = 0; j<spins; j++){
+          memset(right, 0, sizeof(right));
           pauliposn(j, dim, spins, right);
 
-          cblas_cgemm(CblasRowMajor, // Layout
-            CblasNoTrans, // take the transpose of a?
-            CblasNoTrans, // take the transpose of B?
-            spins, // rows of A, C
-            spins, // cols of B, C
-            spins, // clos A, rows B
-            &(MKL_Complex8){1, 0},   // prefactor of the multiplication
-            left, //A Array, size lda* m.
-            spins,      // Specifies the leading dimension of a as declared in the calling (sub)program.
-            right, // B Array, size ldb by k. Before entry the leading n-by-k part of the array b must contain the matrix B.
-            spins,      // Specifies the leading dimension of b as declared in the calling (sub)program.
-            &J[i*spins*j], // prefactor of addition
-            result, // C
-            spins //Specifies the leading dimension of c as declared in the calling (sub)program.
-            );
-        }
+          if (J[i+spins*j] != 0) { // if cgemm gets a 0 prefactor for addition, it zeros your matrix.
+            cblas_cgemm(CblasRowMajor, // Layout
+              CblasNoTrans, // take the transpose of a?
+              CblasNoTrans, // take the transpose of B?
+              dimsize, // rows of A, C
+              dimsize, // cols of B, C
+              dimsize, // clos A, rows B
+              &(MKL_Complex8){1, 0},   // prefactor of the multiplication
+              left, //A Array, size lda* m.
+              dimsize,      // Specifies the leading dimension of a as declared in the calling (sub)program.
+              right, // B Array, size ldb by k. Before entry the leading n-by-k part of the array b must contain the matrix B.
+              dimsize,      // Specifies the leading dimension of b as declared in the calling (sub)program.
+              &(MKL_Complex8){J[i+spins*j], 0}, // prefactor of addition
+              HcomplexTemp, // C
+              dimsize //Specifies the leading dimension of c as declared in the calling (sub)program.
+              );
+          }
       }
     }
+  }
+  // cast to real as the hamiltionion is real eventually
+  printf("copy\n");
+
+  for (int i=0; i<size; i++) { result[i] = HcomplexTemp[i].real; }
+  free(left);
+  free(right);
+
+  free(HcomplexTemp);
+}
+
+void eigensolveH(int size, float* H, float *Energy) {
+  int states = pow(2, size);
+  int info = LAPACKE_ssyevd( LAPACK_ROW_MAJOR, 'V', 'U', states, H, states, Energy );
+  if( info > 0 ) {
+    printf( "The algorithm failed to compute eigenvalues.\n" );
+    exit( 1 );
   }
 }
